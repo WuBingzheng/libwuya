@@ -119,7 +119,7 @@ void wuy_dict_del_node(wuy_hlist_node_t *node);
 /**
  * @brief Return the count of nodes in dict.
  */
-long wuy_dict_count(wuy_dict_t *dict);
+size_t wuy_dict_count(wuy_dict_t *dict);
 
 /**
  * @brief Disable expasion, and set the static bucket size.

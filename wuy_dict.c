@@ -19,7 +19,7 @@ struct wuy_dict_s {
 
 	size_t			node_offset;
 
-	long			count;
+	size_t			count;
 
 	bool			expansion;
 };
@@ -197,7 +197,7 @@ void wuy_dict_del_node(wuy_hlist_node_t *node)
 	wuy_hlist_delete(node);
 }
 
-long wuy_dict_count(wuy_dict_t *dict)
+size_t wuy_dict_count(wuy_dict_t *dict)
 {
 	return dict->count;
 }

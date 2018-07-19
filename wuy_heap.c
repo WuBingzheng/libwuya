@@ -37,7 +37,6 @@ static wuy_heap_t *__heap_new(size_t node_offset)
 wuy_heap_t *wuy_heap_new_func(size_t node_offset, wuy_heap_less_f *key_less)
 {
 	wuy_heap_t *heap = __heap_new(node_offset);
-	heap->key_type = WUY_HEAP_KEY_FUNC;
 	heap->key_less = key_less;
 	return heap;
 }
@@ -46,6 +45,7 @@ wuy_heap_t *wuy_heap_new_type(size_t node_offset, wuy_heap_key_type_e key_type,
 		size_t key_offset, bool key_reverse)
 {
 	wuy_heap_t *heap = __heap_new(node_offset);
+	heap->key_less = NULL;
 	heap->key_type = key_type;
 	heap->key_offset = key_offset;
 	heap->key_reverse = key_reverse;
@@ -67,7 +67,7 @@ static void *__index_to_key(wuy_heap_t *heap, size_t i)
 
 bool __heap_less(wuy_heap_t *heap, size_t i, size_t j)
 {
-	if (heap->key_type == WUY_HEAP_KEY_FUNC) {
+	if (heap->key_less != NULL) {
 		return heap->key_less(__index_to_item(heap, i), __index_to_item(heap, j));
 	}
 
@@ -196,16 +196,18 @@ void *wuy_heap_min(wuy_heap_t *heap)
 	return __index_to_item(heap, 0);
 }
 
-void wuy_heap_delete(wuy_heap_t *heap, void *item)
+bool wuy_heap_delete(wuy_heap_t *heap, void *item)
 {
 	wuy_heap_node_t *node = __item_to_node(heap, item);
 	size_t index = node->index;
 
-	assert(index < heap->count);
-	assert(heap->array[index] == node);
+	if (index >= heap->count || heap->array[index] != node) {
+		return false;
+	}
 
 	__heap_swap(heap, index, heap->count--);
 	__heapify_down(heap, index);
+	return true;
 }
 
 size_t wuy_heap_count(wuy_heap_t *heap)
