@@ -23,6 +23,8 @@
 #include <stdio.h>
 #include <stddef.h>
 
+#include "wuy_container.h"
+
 /**
  * @brief Head of list.
  */
@@ -103,11 +105,5 @@ static inline void wuy_hlist_delete(wuy_hlist_node_t *node)
 #define wuy_hlist_iter_safe(pos, n, head) \
 	for (pos = (head)->first, n = pos?pos->next:NULL; pos; \
 		pos = pos->next, n = pos?pos->next:NULL)
-
-/**
- * @brief Return the container of list node.
- */
-#define wuy_hlist_entry(pos, type, member) \
-	((type *)((char *)(pos) - offsetof(type, member)))
 
 #endif

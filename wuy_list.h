@@ -20,6 +20,8 @@
 #include <stdio.h>
 #include <stddef.h>
 
+#include "wuy_container.h"
+
 /**
  * @brief Embed this node into your data struct in order to use this lib.
  *
@@ -137,11 +139,5 @@ static inline int wuy_list_empty(wuy_list_head_t *head)
 #define wuy_list_iter_reverse_safe(pos, n, head) \
 	for (pos = (head)->prev, n = pos->prev; pos != (head); \
 		pos = n, n = pos->prev)
-
-/**
- * @brief Return the container of list node.
- */
-#define wuy_list_entry(pos, type, member) \
-	((type *)((char *)(pos) - offsetof(type, member)))
 
 #endif

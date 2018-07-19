@@ -98,7 +98,7 @@ void *wuy_pool_alloc(wuy_pool_t *pool)
 			return NULL;
 		}
 	} else {
-		block = wuy_hlist_entry(pool->block_head.first, wuy_pool_block_t, block_node);
+		block = wuy_containerof(pool->block_head.first, wuy_pool_block_t, block_node);
 	}
 
 	wuy_hlist_node_t *node = block->item_head.first;
