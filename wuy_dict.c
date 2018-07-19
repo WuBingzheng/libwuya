@@ -24,9 +24,9 @@ struct wuy_dict_s {
 	bool			expansion;
 };
 
-#define DICT_SIZE_INIT		64
-#define DICT_SIZE_MAX		64*1024*1024
-#define DICT_EXPANSION_FACTOR	2
+#define WUY_DICT_SIZE_INIT		64
+#define WUY_DICT_SIZE_MAX		64*1024*1024
+#define WUY_DICT_EXPANSION_FACTOR	2
 
 wuy_dict_t *wuy_dict_new(wuy_dict_hash_f *hash, wuy_dict_equal_f *equal,
 		size_t node_offset)
@@ -34,7 +34,7 @@ wuy_dict_t *wuy_dict_new(wuy_dict_hash_f *hash, wuy_dict_equal_f *equal,
 	wuy_dict_t *dict = malloc(sizeof(wuy_dict_t));
 	assert(dict != NULL);
 
-	dict->bucket_size = DICT_SIZE_INIT;
+	dict->bucket_size = WUY_DICT_SIZE_INIT;
 	dict->buckets = calloc(dict->bucket_size, sizeof(wuy_hlist_head_t));
 	assert(dict->buckets != NULL);
 
@@ -75,11 +75,11 @@ void wuy_dict_disable_expasion(wuy_dict_t *dict, uint32_t bucket_size)
 
 static wuy_hlist_node_t *__item_to_node(wuy_dict_t *dict, const void *item)
 {
-	return (wuy_hlist_node_t *)((uintptr_t)item - dict->node_offset);
+	return (wuy_hlist_node_t *)((char *)item - dict->node_offset);
 }
 static void *__node_to_item(wuy_dict_t *dict, wuy_hlist_node_t *node)
 {
-	return (wuy_hlist_node_t *)((uintptr_t)node + dict->node_offset);
+	return (char *)node + dict->node_offset;
 }
 
 static uint32_t __dict_index(wuy_dict_t *dict, const void *item)
@@ -94,9 +94,9 @@ static void __dict_expasion(wuy_dict_t *dict)
 	}
 
 	/* expansion */
-	if (dict->count >= dict->bucket_size * DICT_EXPANSION_FACTOR
+	if (dict->count >= dict->bucket_size * WUY_DICT_EXPANSION_FACTOR
 			&& dict->prev_buckets == NULL
-			&& dict->bucket_size < DICT_SIZE_MAX) {
+			&& dict->bucket_size < WUY_DICT_SIZE_MAX) {
 
 		wuy_hlist_head_t *newb = calloc(dict->bucket_size * 2,
 				sizeof(wuy_hlist_head_t));
