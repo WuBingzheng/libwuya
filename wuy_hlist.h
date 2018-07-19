@@ -1,0 +1,106 @@
+/**
+ * @file     wuy_hlist.h
+ * @author   Wu Bingzheng <wubingzheng@gmail.com>
+ * @date     2018-7-18
+ *
+ * @section LICENSE
+ * GPLv2
+ *
+ * @section DESCRIPTION
+ *
+ * Double linked lists with a single pointer list head.
+ * Mostly useful for hash tables where the two pointer list head is
+ * too wasteful.
+ * You lose the ability to access the tail in O(1).
+ *
+ * Copied from include/linux/list.h. We remove and rename some structs
+ * and functions for consistent with the library.
+ */
+
+#ifndef WUY_HLIST_H
+#define WUY_HLIST_H
+
+#include <stdio.h>
+
+/**
+ * @brief Head of list.
+ */
+typedef struct wuy_hlist_head_s wuy_hlist_head_t;
+
+/**
+ * @brief Embed this node into your data struct in order to use this lib.
+ */
+typedef struct wuy_hlist_node_s wuy_hlist_node_t;
+
+struct wuy_hlist_head_s {
+	wuy_hlist_node_t *first;
+};
+struct wuy_hlist_node_s {
+	wuy_hlist_node_t *next, **pprev;
+};
+
+/**
+ * @brief Initialize at declare.
+ */
+#define WUY_HLIST_HEAD_INIT { .first = NULL }
+
+/**
+ * @brief Declare and initialize.
+ */
+#define WUY_HLIST_HEAD(name) wuy_hlist_head_t name = { .first = NULL }
+
+/**
+ * @brief Initialize a head.
+ */
+static inline void wuy_hlist_head_init(wuy_hlist_head_t *head)
+{
+	head->first = NULL;
+}
+
+/**
+ * @brief Return if the list head is empty.
+ */
+static inline int wuy_hlist_empty(const wuy_hlist_head_t *head)
+{
+	return head->first == NULL;
+}
+
+/**
+ * @brief Add node after head.
+ */
+static inline void wuy_hlist_add(wuy_hlist_node_t *node, wuy_hlist_head_t *head)
+{
+	wuy_hlist_node_t *first = head->first;
+	node->next = first;
+	if (first)
+		first->pprev = &node->next;
+	head->first = node;
+	node->pprev = &head->first;
+}
+
+/**
+ * @brief Delete node from its list.
+ */
+static inline void wuy_hlist_delete(wuy_hlist_node_t *node)
+{
+	wuy_hlist_node_t *next = node->next;
+	wuy_hlist_node_t **pprev = node->pprev;
+	*pprev = next;
+	if (next)
+		next->pprev = pprev;
+}
+
+/**
+ * @brief Iterate over a list, while it's NOT safe to delete node.
+ */
+#define wuy_hlist_iter(pos, head) \
+	for (pos = (head)->first; pos; pos = pos->next)
+
+/**
+ * @brief Iterate over a list, while it's safe to delete node.
+ */
+#define wuy_hlist_iter_safe(pos, n, head) \
+	for (pos = (head)->first, n = pos?pos->next:NULL; pos; \
+		pos = pos->next, n = pos?pos->next:NULL)
+
+#endif
