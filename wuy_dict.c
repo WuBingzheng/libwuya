@@ -75,11 +75,11 @@ void wuy_dict_disable_expasion(wuy_dict_t *dict, uint32_t bucket_size)
 
 static wuy_hlist_node_t *__item_to_node(wuy_dict_t *dict, const void *item)
 {
-	return (wuy_hlist_node_t *)((char *)item - dict->node_offset);
+	return (wuy_hlist_node_t *)((char *)item + dict->node_offset);
 }
 static void *__node_to_item(wuy_dict_t *dict, wuy_hlist_node_t *node)
 {
-	return (char *)node + dict->node_offset;
+	return (char *)node - dict->node_offset;
 }
 
 static uint32_t __dict_index(wuy_dict_t *dict, const void *item)

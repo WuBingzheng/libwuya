@@ -84,6 +84,8 @@ wuy_heap_t *wuy_heap_new_type(size_t node_offset, wuy_heap_key_type_e key_type,
 /**
  * @brief Add an item into the heap.
  *
+ * @note: It aborts if item is in the heap already.
+ *
  * @return true if success, or false if memory allocation fails.
  */
 bool wuy_heap_push(wuy_heap_t *heap, void *item);
@@ -92,6 +94,20 @@ bool wuy_heap_push(wuy_heap_t *heap, void *item);
  * @brief Pop and return the min item.
  */
 void *wuy_heap_pop(wuy_heap_t *heap);
+
+/**
+ * @brief Fix an item in the heap.
+ *
+ * @note: It aborts if item is not in the heap yet.
+ */
+void wuy_heap_fix(wuy_heap_t *heap, void *item);
+
+/**
+ * @brief Push item into heap if not exist yet, or fix it.
+ *
+ * @return true if success, or false if memory allocation fails.
+ */
+bool wuy_heap_push_or_fix(wuy_heap_t *heap, void *item);
 
 /**
  * @brief Return the min item but not delete it.
