@@ -73,21 +73,21 @@ void wuy_dict_disable_expasion(wuy_dict_t *dict, uint32_t bucket_size)
 	bzero(dict->buckets, align * sizeof(wuy_hlist_head_t));
 }
 
-static wuy_hlist_node_t *__item_to_node(wuy_dict_t *dict, const void *item)
+static wuy_hlist_node_t *_item_to_node(wuy_dict_t *dict, const void *item)
 {
 	return (wuy_hlist_node_t *)((char *)item + dict->node_offset);
 }
-static void *__node_to_item(wuy_dict_t *dict, wuy_hlist_node_t *node)
+static void *_node_to_item(wuy_dict_t *dict, wuy_hlist_node_t *node)
 {
 	return (char *)node - dict->node_offset;
 }
 
-static uint32_t __dict_index(wuy_dict_t *dict, const void *item)
+static uint32_t wuy_dict_index(wuy_dict_t *dict, const void *item)
 {
 	return dict->hash(item) & (dict->bucket_size - 1);
 }
 
-static void __dict_expasion(wuy_dict_t *dict)
+static void wuy_dict_expasion(wuy_dict_t *dict)
 {
 	if (!dict->expansion) {
 		return;
@@ -115,8 +115,8 @@ static void __dict_expasion(wuy_dict_t *dict)
 
 		wuy_hlist_node_t *node, *safe;
 		wuy_hlist_iter_safe(node, safe, &dict->prev_buckets[dict->split]) {
-			void *item = __node_to_item(dict, node);
-			wuy_hlist_add(node, &dict->buckets[__dict_index(dict, item)]);
+			void *item = _node_to_item(dict, node);
+			wuy_hlist_add(node, &dict->buckets[wuy_dict_index(dict, item)]);
 		}
 
 		dict->split++;
@@ -130,23 +130,23 @@ static void __dict_expasion(wuy_dict_t *dict)
 
 void wuy_dict_add(wuy_dict_t *dict, void *item)
 {
-	uint32_t index = __dict_index(dict, item);
-	wuy_hlist_add(__item_to_node(dict, item), &dict->buckets[index]);
+	uint32_t index = wuy_dict_index(dict, item);
+	wuy_hlist_add(_item_to_node(dict, item), &dict->buckets[index]);
 
 	dict->count++;
-	__dict_expasion(dict);
+	wuy_dict_expasion(dict);
 }
 
 void *wuy_dict_get(wuy_dict_t *dict, const void *key)
 {
-	__dict_expasion(dict);
+	wuy_dict_expasion(dict);
 
-	uint32_t index = __dict_index(dict, key);
+	uint32_t index = wuy_dict_index(dict, key);
 
 	/* search from dict->buckets */
 	wuy_hlist_node_t *node;
 	wuy_hlist_iter(node, &dict->buckets[index]) {
-		void *item = __node_to_item(dict, node);
+		void *item = _node_to_item(dict, node);
 		if (dict->equal(item, key)) {
 			return item;
 		}
@@ -159,7 +159,7 @@ void *wuy_dict_get(wuy_dict_t *dict, const void *key)
 			index -= prev_size;
 		}
 		wuy_hlist_iter(node, &dict->prev_buckets[index]) {
-			void *item = __node_to_item(dict, node);
+			void *item = _node_to_item(dict, node);
 			if (dict->equal(item, key)) {
 				return item;
 			}
@@ -172,7 +172,7 @@ void *wuy_dict_get(wuy_dict_t *dict, const void *key)
 
 void wuy_dict_delete(wuy_dict_t *dict, void *item)
 {
-	wuy_hlist_delete(__item_to_node(dict, item));
+	wuy_hlist_delete(_item_to_node(dict, item));
 	dict->count--;
 }
 

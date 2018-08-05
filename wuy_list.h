@@ -53,7 +53,7 @@ static inline void wuy_list_init(wuy_list_head_t *head)
 	head->prev = head;
 }
 
-static inline void __list_add(wuy_list_head_t *node,
+static inline void _list_add(wuy_list_head_t *node,
 	wuy_list_head_t *prev, wuy_list_head_t *next)
 {
 	node->next = next;
@@ -69,7 +69,7 @@ static inline void __list_add(wuy_list_head_t *node,
 static inline void wuy_list_add(wuy_list_head_t *node,
 		wuy_list_head_t *head)
 {
-	__list_add(node, head, head->next);
+	_list_add(node, head, head->next);
 }
 
 /**
@@ -78,10 +78,10 @@ static inline void wuy_list_add(wuy_list_head_t *node,
 static inline void wuy_list_add_tail(wuy_list_head_t *node,
 		wuy_list_head_t *head)
 {
-	__list_add(node, head->prev, head);
+	_list_add(node, head->prev, head);
 }
 
-static inline void __list_del(wuy_list_head_t *prev,
+static inline void _list_del(wuy_list_head_t *prev,
 		wuy_list_head_t *next)
 {
 	next->prev = prev;
@@ -93,7 +93,7 @@ static inline void __list_del(wuy_list_head_t *prev,
  */
 static inline void wuy_list_delete(wuy_list_head_t *node)
 {
-	__list_del(node->prev, node->next);
+	_list_del(node->prev, node->next);
 	node->next = node->prev = NULL;
 }
 
@@ -102,7 +102,7 @@ static inline void wuy_list_delete(wuy_list_head_t *node)
  */
 static inline void wuy_list_del_init(wuy_list_head_t *node)
 {
-	__list_del(node->prev, node->next);
+	_list_del(node->prev, node->next);
 	wuy_list_init(node); 
 }
 

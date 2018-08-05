@@ -20,7 +20,7 @@ struct wuy_heap_s {
 
 #define WUY_HEAP_SIZE_INIT 1024
 
-static wuy_heap_t *__heap_new(size_t node_offset)
+static wuy_heap_t *wuy_heap_new(size_t node_offset)
 {
 	wuy_heap_t *heap = malloc(sizeof(wuy_heap_t));
 	assert(heap != NULL);
@@ -36,7 +36,7 @@ static wuy_heap_t *__heap_new(size_t node_offset)
 
 wuy_heap_t *wuy_heap_new_func(size_t node_offset, wuy_heap_less_f *key_less)
 {
-	wuy_heap_t *heap = __heap_new(node_offset);
+	wuy_heap_t *heap = wuy_heap_new(node_offset);
 	heap->key_less = key_less;
 	return heap;
 }
@@ -44,7 +44,7 @@ wuy_heap_t *wuy_heap_new_func(size_t node_offset, wuy_heap_less_f *key_less)
 wuy_heap_t *wuy_heap_new_type(size_t node_offset, wuy_heap_key_type_e key_type,
 		size_t key_offset, bool key_reverse)
 {
-	wuy_heap_t *heap = __heap_new(node_offset);
+	wuy_heap_t *heap = wuy_heap_new(node_offset);
 	heap->key_less = NULL;
 	heap->key_type = key_type;
 	heap->key_offset = key_offset;
@@ -52,27 +52,27 @@ wuy_heap_t *wuy_heap_new_type(size_t node_offset, wuy_heap_key_type_e key_type,
 	return heap;
 }
 
-static wuy_heap_node_t *__item_to_node(wuy_heap_t *heap, const void *item)
+static wuy_heap_node_t *_item_to_node(wuy_heap_t *heap, const void *item)
 {
 	return (wuy_heap_node_t *)((char *)item + heap->node_offset);
 }
-static void *__index_to_item(wuy_heap_t *heap, size_t i)
+static void *_index_to_item(wuy_heap_t *heap, size_t i)
 {
 	return (char *)(heap->array[i]) - heap->node_offset;
 }
-static void *__index_to_key(wuy_heap_t *heap, size_t i)
+static void *_index_to_key(wuy_heap_t *heap, size_t i)
 {
 	return (char *)(heap->array[i]) - heap->node_offset + heap->key_offset;
 }
 
-bool __heap_less(wuy_heap_t *heap, size_t i, size_t j)
+bool wuy_heap_less(wuy_heap_t *heap, size_t i, size_t j)
 {
 	if (heap->key_less != NULL) {
-		return heap->key_less(__index_to_item(heap, i), __index_to_item(heap, j));
+		return heap->key_less(_index_to_item(heap, i), _index_to_item(heap, j));
 	}
 
-	void *pki = __index_to_key(heap, i);
-	void *pkj = __index_to_key(heap, j);
+	void *pki = _index_to_key(heap, i);
+	void *pkj = _index_to_key(heap, j);
 
 	bool ret;
 
@@ -105,7 +105,7 @@ bool __heap_less(wuy_heap_t *heap, size_t i, size_t j)
 	return heap->key_reverse ? ret : !ret;
 }
 
-static void __heap_swap(wuy_heap_t *heap, size_t i, size_t j)
+static void wuy_heap_swap(wuy_heap_t *heap, size_t i, size_t j)
 {
 	wuy_heap_node_t *tmp = heap->array[i];
 	heap->array[i] = heap->array[j];
@@ -115,29 +115,29 @@ static void __heap_swap(wuy_heap_t *heap, size_t i, size_t j)
 	heap->array[j]->index = j;
 }
 
-static void __heapify_up(wuy_heap_t *heap, size_t i)
+static void wuy_heapify_up(wuy_heap_t *heap, size_t i)
 {
 	while (i > 0) {
 		size_t parent = (i - 1) / 2;
-		if (parent == i || !__heap_less(heap, i, parent)) {
+		if (parent == i || !wuy_heap_less(heap, i, parent)) {
 			break;
 		}
-		__heap_swap(heap, i, parent);
+		wuy_heap_swap(heap, i, parent);
 		i = parent;
 	}
 }
 
-static void __heapify_down(wuy_heap_t *heap, size_t i)
+static void wuy_heapify_down(wuy_heap_t *heap, size_t i)
 {
 	while (1) {
 		size_t left = i * 2 + 1;
 		size_t right = left + 1;
 
-		if (left < heap->count && __heap_less(heap, left, i)) {
-			__heap_swap(heap, left, i);
+		if (left < heap->count && wuy_heap_less(heap, left, i)) {
+			wuy_heap_swap(heap, left, i);
 			i = left;
-		} else if (right < heap->count && __heap_less(heap, right, i)) {
-			__heap_swap(heap, right, i);
+		} else if (right < heap->count && wuy_heap_less(heap, right, i)) {
+			wuy_heap_swap(heap, right, i);
 			i = right;
 		} else {
 			break;
@@ -151,7 +151,7 @@ bool wuy_heap_is_linked(wuy_heap_t *heap, wuy_heap_node_t *node)
 	return (index < heap->count && heap->array[index] == node);
 }
 
-bool __heap_push(wuy_heap_t *heap, wuy_heap_node_t *node)
+bool wuy_heap_push_node(wuy_heap_t *heap, wuy_heap_node_t *node)
 {
 	if (heap->count >= heap->capture) {
 		void *olda = heap->array;
@@ -173,56 +173,56 @@ bool __heap_push(wuy_heap_t *heap, wuy_heap_node_t *node)
 	heap->array[heap->count] = node;
 	node->index = heap->count;
 
-	__heapify_up(heap, heap->count);
+	wuy_heapify_up(heap, heap->count);
 	heap->count++;
 	return true;
 }
 
 bool wuy_heap_push(wuy_heap_t *heap, void *item)
 {
-	wuy_heap_node_t *node = __item_to_node(heap, item);
+	wuy_heap_node_t *node = _item_to_node(heap, item);
 	assert(!wuy_heap_is_linked(heap, node));
 
-	return __heap_push(heap, node);
+	return wuy_heap_push_node(heap, node);
 }
 
-static void __heap_fix(wuy_heap_t *heap, wuy_heap_node_t *node)
+static void wuy_heap_fix_node(wuy_heap_t *heap, wuy_heap_node_t *node)
 {
 	size_t index = node->index;
 
-	if (index > 0 && __heap_less(heap, index, (index - 1) / 2)) {
-		__heapify_up(heap, index);
+	if (index > 0 && wuy_heap_less(heap, index, (index - 1) / 2)) {
+		wuy_heapify_up(heap, index);
 	} else {
-		__heapify_down(heap, index);
+		wuy_heapify_down(heap, index);
 	}
 }
 
 void wuy_heap_fix(wuy_heap_t *heap, void *item)
 {
-	wuy_heap_node_t *node = __item_to_node(heap, item);
+	wuy_heap_node_t *node = _item_to_node(heap, item);
 	assert(wuy_heap_is_linked(heap, node));
 
-	__heap_fix(heap, node);
+	wuy_heap_fix_node(heap, node);
 }
 
 bool wuy_heap_push_or_fix(wuy_heap_t *heap, void *item)
 {
-	wuy_heap_node_t *node = __item_to_node(heap, item);
+	wuy_heap_node_t *node = _item_to_node(heap, item);
 
 	if (wuy_heap_is_linked(heap, node)) {
-		__heap_fix(heap, node);
+		wuy_heap_fix_node(heap, node);
 		return true;
 	} else {
-		return __heap_push(heap, node);
+		return wuy_heap_push_node(heap, node);
 	}
 }
 
-static void __heap_delete(wuy_heap_t *heap, size_t index)
+static void wuy_heap_delete_index(wuy_heap_t *heap, size_t index)
 {
 	heap->count--;
 	if (heap->count > 0) {
-		__heap_swap(heap, index, heap->count);
-		__heapify_down(heap, index);
+		wuy_heap_swap(heap, index, heap->count);
+		wuy_heapify_down(heap, index);
 	}
 }
 
@@ -232,9 +232,9 @@ void *wuy_heap_pop(wuy_heap_t *heap)
 		return NULL;
 	}
 
-	void *item = __index_to_item(heap, 0);
+	void *item = _index_to_item(heap, 0);
 
-	__heap_delete(heap, 0);
+	wuy_heap_delete_index(heap, 0);
 
 	return item;
 }
@@ -245,18 +245,18 @@ void *wuy_heap_min(wuy_heap_t *heap)
 		return NULL;
 	}
 
-	return __index_to_item(heap, 0);
+	return _index_to_item(heap, 0);
 }
 
 bool wuy_heap_delete(wuy_heap_t *heap, void *item)
 {
-	wuy_heap_node_t *node = __item_to_node(heap, item);
+	wuy_heap_node_t *node = _item_to_node(heap, item);
 
 	if (!wuy_heap_is_linked(heap, node)) {
 		return false;
 	}
 
-	__heap_delete(heap, node->index);
+	wuy_heap_delete_index(heap, node->index);
 	return true;
 }
 

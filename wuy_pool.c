@@ -44,7 +44,7 @@ typedef struct {
 	int			frees;
 } wuy_pool_block_t;
 
-static size_t __item_size_leader(wuy_pool_t *pool)
+static size_t _item_size_leader(wuy_pool_t *pool)
 {
 	return pool->item_size + sizeof(wuy_pool_block_t *);
 }
@@ -59,14 +59,14 @@ wuy_pool_t *wuy_pool_new(size_t item_size)
 	wuy_hlist_head_init(&pool->block_head);
 
 	/* malloc use @brk if size<128K */
-	pool->block_items = (128*1024 - sizeof(wuy_pool_block_t) - 24) / __item_size_leader(pool);
+	pool->block_items = (128*1024 - sizeof(wuy_pool_block_t) - 24) / _item_size_leader(pool);
 	return pool;
 }
 
-static wuy_pool_block_t *__block_new(wuy_pool_t *pool)
+static wuy_pool_block_t *wuy_pool_block_new(wuy_pool_t *pool)
 {
 	wuy_pool_block_t *block = malloc(sizeof(wuy_pool_block_t)
-			+ __item_size_leader(pool) * pool->block_items);
+			+ _item_size_leader(pool) * pool->block_items);
 	if (block == NULL) {
 		return NULL;
 	}
@@ -82,7 +82,7 @@ static wuy_pool_block_t *__block_new(wuy_pool_t *pool)
 		*((wuy_pool_block_t **)leader) = block;
 		wuy_hlist_node_t *p = (wuy_hlist_node_t *)(leader + sizeof(wuy_pool_block_t *));
 		wuy_hlist_add(p, &block->item_head);
-		leader += __item_size_leader(pool);
+		leader += _item_size_leader(pool);
 	}
 
 	return block;
@@ -93,7 +93,7 @@ void *wuy_pool_alloc(wuy_pool_t *pool)
 	wuy_pool_block_t *block;
 
 	if (wuy_hlist_empty(&pool->block_head)) {
-		block = __block_new(pool);
+		block = wuy_pool_block_new(pool);
 		if (block == NULL) {
 			return NULL;
 		}
