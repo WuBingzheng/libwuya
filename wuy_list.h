@@ -109,7 +109,7 @@ static inline void wuy_list_del_init(wuy_list_head_t *node)
 /**
  * @brief Return if the list head is empty.
  */
-static inline int wuy_list_empty(wuy_list_head_t *head)
+static inline bool wuy_list_empty(wuy_list_head_t *head)
 {
 	return head->next == head;
 }
@@ -126,6 +126,12 @@ static inline int wuy_list_empty(wuy_list_head_t *head)
 #define wuy_list_iter_safe(pos, n, head) \
 	for (pos = (head)->next, n = pos->next; pos != (head); \
 		pos = n, n = pos->next)
+
+/**
+ * @brief Iterate over a list, always getting the first.
+ */
+#define wuy_list_iter_first(pos, head) \
+	while ((pos = (head)->next) != (head))
 
 /**
  * @brief Iterate over a list reverse, while it's NOT safe to delete node.

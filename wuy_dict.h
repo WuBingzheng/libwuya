@@ -51,7 +51,7 @@ typedef uint32_t wuy_dict_hash_f(const void *item);
 /**
  * @brief Return if 2 items have the same key.
  */
-typedef bool wuy_dict_equal_f(const char *a, const char *b);
+typedef bool wuy_dict_equal_f(const void *a, const void *b);
 
 /**
  * @brief Create a dict.
@@ -127,5 +127,27 @@ size_t wuy_dict_count(wuy_dict_t *dict);
  * @note You MUST NOT call this after adding any node to the dict.
  */
 void wuy_dict_disable_expasion(wuy_dict_t *dict, uint32_t bucket_size);
+
+/**
+ * @brief BKDRHash, a simple string hash
+ */
+static inline uint32_t wuy_dict_hash_string(const char *str)
+{
+	uint32_t seed = 131, hash = 0;
+	while (*str) {
+		hash = hash * seed + (*str++);
+	}
+	return hash;
+}
+
+/**
+ * @brief a simple pointer hash.
+ * In Knuth's "The Art of Computer Programming", section 6.4
+ */
+static inline uint32_t wuy_dict_hash_pointer(const void *p)
+{
+	uintptr_t n = (uintptr_t)p;
+	return (uint32_t)(n >> 3) * 2654435761;
+}
 
 #endif
