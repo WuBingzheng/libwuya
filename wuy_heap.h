@@ -61,25 +61,25 @@ typedef enum {
 /**
  * @brief Create a new heap, with the user-defined comparison function.
  *
- * @param node_offset the offset of wuy_heap_node_t in your data struct.
  * @param key_less use-defined compare function.
+ * @param node_offset the offset of wuy_heap_node_t in your data struct.
  *
  * @return the new heap. It aborts the program if memory allocation fails.
  */
-wuy_heap_t *wuy_heap_new_func(size_t node_offset, wuy_heap_less_f *key_less);
+wuy_heap_t *wuy_heap_new_func(wuy_heap_less_f *key_less, size_t node_offset);
 
 /**
  * @brief Create a new heap, with general comparison key type.
  *
- * @param node_offset the offset of wuy_heap_node_t in your data struct.
  * @param key_type see wuy_heap_key_type_e.
  * @param key_offset the offset of key in your data struct.
  * @param key_reverse if reverse the comparison.
+ * @param node_offset the offset of wuy_heap_node_t in your data struct.
  *
  * @return the new heap. It aborts the program if memory allocation fails.
  */
-wuy_heap_t *wuy_heap_new_type(size_t node_offset, wuy_heap_key_type_e key_type,
-		size_t key_offset, bool key_reverse);
+wuy_heap_t *wuy_heap_new_type(wuy_heap_key_type_e key_type, size_t key_offset,
+		bool key_reverse, size_t node_offset);
 
 /**
  * @brief Add an item into the heap.

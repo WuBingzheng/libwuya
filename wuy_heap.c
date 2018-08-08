@@ -34,15 +34,15 @@ static wuy_heap_t *wuy_heap_new(size_t node_offset)
 	return heap;
 }
 
-wuy_heap_t *wuy_heap_new_func(size_t node_offset, wuy_heap_less_f *key_less)
+wuy_heap_t *wuy_heap_new_func(wuy_heap_less_f *key_less, size_t node_offset)
 {
 	wuy_heap_t *heap = wuy_heap_new(node_offset);
 	heap->key_less = key_less;
 	return heap;
 }
 
-wuy_heap_t *wuy_heap_new_type(size_t node_offset, wuy_heap_key_type_e key_type,
-		size_t key_offset, bool key_reverse)
+wuy_heap_t *wuy_heap_new_type(wuy_heap_key_type_e key_type, size_t key_offset,
+		bool key_reverse, size_t node_offset)
 {
 	wuy_heap_t *heap = wuy_heap_new(node_offset);
 	heap->key_less = NULL;
@@ -65,7 +65,7 @@ static void *_index_to_key(wuy_heap_t *heap, size_t i)
 	return (char *)(heap->array[i]) - heap->node_offset + heap->key_offset;
 }
 
-bool wuy_heap_less(wuy_heap_t *heap, size_t i, size_t j)
+static bool wuy_heap_less(wuy_heap_t *heap, size_t i, size_t j)
 {
 	if (heap->key_less != NULL) {
 		return heap->key_less(_index_to_item(heap, i), _index_to_item(heap, j));

@@ -99,7 +99,7 @@ again:
 	return client_fd;
 }
 
-static inline int tcp_connect(struct sockaddr *sa)
+static inline int wuy_tcp_connect(struct sockaddr *sa)
 {
 	int fd = socket(sa->sa_family, SOCK_STREAM, 0);
 	if (fd < 0) {
