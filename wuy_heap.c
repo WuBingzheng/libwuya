@@ -102,7 +102,7 @@ static bool wuy_heap_less(wuy_heap_t *heap, size_t i, size_t j)
 		abort();
 	}
 
-	return heap->key_reverse ? ret : !ret;
+	return heap->key_reverse ? !ret : ret;
 }
 
 static void wuy_heap_swap(wuy_heap_t *heap, size_t i, size_t j)
