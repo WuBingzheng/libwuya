@@ -71,7 +71,7 @@ static inline int wuy_hlist_empty(const wuy_hlist_head_t *head)
 /**
  * @brief Add node after head.
  */
-static inline void wuy_hlist_add(wuy_hlist_node_t *node, wuy_hlist_head_t *head)
+static inline void wuy_hlist_insert(wuy_hlist_head_t *head, wuy_hlist_node_t *node)
 {
 	wuy_hlist_node_t *first = head->first;
 	node->next = first;
@@ -96,13 +96,13 @@ static inline void wuy_hlist_delete(wuy_hlist_node_t *node)
 /**
  * @brief Iterate over a list, while it's NOT safe to delete node.
  */
-#define wuy_hlist_iter(pos, head) \
+#define wuy_hlist_iter(head, pos) \
 	for (pos = (head)->first; pos; pos = pos->next)
 
 /**
  * @brief Iterate over a list, while it's safe to delete node.
  */
-#define wuy_hlist_iter_safe(pos, n, head) \
+#define wuy_hlist_iter_safe(head, pos, n) \
 	for (pos = (head)->first, n = pos?pos->next:NULL; pos; \
 		pos = pos->next, n = pos?pos->next:NULL)
 

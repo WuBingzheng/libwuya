@@ -114,9 +114,9 @@ static void wuy_dict_expasion(wuy_dict_t *dict)
 	if (dict->prev_buckets != NULL) {
 
 		wuy_hlist_node_t *node, *safe;
-		wuy_hlist_iter_safe(node, safe, &dict->prev_buckets[dict->split]) {
+		wuy_hlist_iter_safe(&dict->prev_buckets[dict->split], node, safe) {
 			void *item = _node_to_item(dict, node);
-			wuy_hlist_add(node, &dict->buckets[wuy_dict_index(dict, item)]);
+			wuy_hlist_insert(&dict->buckets[wuy_dict_index(dict, item)], node);
 		}
 
 		dict->split++;
@@ -131,7 +131,7 @@ static void wuy_dict_expasion(wuy_dict_t *dict)
 void wuy_dict_add(wuy_dict_t *dict, void *item)
 {
 	uint32_t index = wuy_dict_index(dict, item);
-	wuy_hlist_add(_item_to_node(dict, item), &dict->buckets[index]);
+	wuy_hlist_insert(&dict->buckets[index], _item_to_node(dict, item));
 
 	dict->count++;
 	wuy_dict_expasion(dict);
@@ -145,7 +145,7 @@ void *wuy_dict_get(wuy_dict_t *dict, const void *key)
 
 	/* search from dict->buckets */
 	wuy_hlist_node_t *node;
-	wuy_hlist_iter(node, &dict->buckets[index]) {
+	wuy_hlist_iter(&dict->buckets[index], node) {
 		void *item = _node_to_item(dict, node);
 		if (dict->equal(item, key)) {
 			return item;
@@ -158,7 +158,7 @@ void *wuy_dict_get(wuy_dict_t *dict, const void *key)
 		if (index >= prev_size) {
 			index -= prev_size;
 		}
-		wuy_hlist_iter(node, &dict->prev_buckets[index]) {
+		wuy_hlist_iter(&dict->prev_buckets[index], node) {
 			void *item = _node_to_item(dict, node);
 			if (dict->equal(item, key)) {
 				return item;

@@ -171,7 +171,7 @@ static wuy_skiplist_node_t *wuy_skiplist_node_new(wuy_skiplist_t *skiplist, int 
 	return wuy_pool_alloc(skiplist->skpool->pools[level - 2]);
 }
 
-bool wuy_skiplist_add(wuy_skiplist_t *skiplist, void *item)
+bool wuy_skiplist_insert(wuy_skiplist_t *skiplist, void *item)
 {
 	wuy_skiplist_node_t *previous[skiplist->skpool->max];
 	wuy_skiplist_get_previous(skiplist, previous, item);

@@ -45,7 +45,7 @@ wuy_skiplist_t *wuy_skiplist_new_type(wuy_skiplist_key_type_e key_type,
 		size_t key_offset, bool key_reverse,
 		size_t node_offset, wuy_skiplist_pool_t *skpool);
 
-bool wuy_skiplist_add(wuy_skiplist_t *skiplist, void *item);
+bool wuy_skiplist_insert(wuy_skiplist_t *skiplist, void *item);
 
 bool wuy_skiplist_delete(wuy_skiplist_t *skiplist, void *item);
 
@@ -58,11 +58,11 @@ long wuy_skiplist_count(wuy_skiplist_t *skiplist);
 void *wuy_skiplist_first(wuy_skiplist_t *skiplist);
 void *wuy_skiplist_next(wuy_skiplist_t *skiplist, void *item);
 
-#define wuy_skiplist_iter(item, skiplist) \
+#define wuy_skiplist_iter(skiplist, item) \
 	for (item = wuy_skiplist_first(skiplist); item != NULL; \
 			item = wuy_skiplist_next(skiplist, item))
 
-#define wuy_skiplist_iter_safe(item, next, skiplist) \
+#define wuy_skiplist_iter_safe(skiplist, item, next) \
 	for (item = wuy_skiplist_first(skiplist), next = wuy_skiplist_next(skiplist, item); \
 			item != NULL; \
 			item = next, next = wuy_skiplist_next(skiplist, item))

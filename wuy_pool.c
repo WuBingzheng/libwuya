@@ -73,7 +73,7 @@ static wuy_pool_block_t *wuy_pool_block_new(wuy_pool_t *pool)
 
 	block->pool = pool;
 	block->frees = pool->block_items;
-	wuy_hlist_add(&block->block_node, &pool->block_head);
+	wuy_hlist_insert(&pool->block_head, &block->block_node);
 	wuy_hlist_head_init(&block->item_head);
 
 	int i;
@@ -81,7 +81,7 @@ static wuy_pool_block_t *wuy_pool_block_new(wuy_pool_t *pool)
 	for (i = 0; i < pool->block_items; i++) {
 		*((wuy_pool_block_t **)leader) = block;
 		wuy_hlist_node_t *p = (wuy_hlist_node_t *)(leader + sizeof(wuy_pool_block_t *));
-		wuy_hlist_add(p, &block->item_head);
+		wuy_hlist_insert(&block->item_head, p);
 		leader += _item_size_leader(pool);
 	}
 
@@ -123,12 +123,12 @@ void wuy_pool_free(void *p)
 	wuy_pool_t *pool = block->pool;
 
 	bzero(p, pool->item_size);
-	wuy_hlist_add((wuy_hlist_node_t *)p, &block->item_head);
+	wuy_hlist_insert(&block->item_head, (wuy_hlist_node_t *)p);
 
 	block->frees++;
 	if (block->frees == 1) {
 		/* if there WAS no free item in this block, we catch it again */
-		wuy_hlist_add(&block->block_node, &pool->block_head);
+		wuy_hlist_insert(&pool->block_head, &block->block_node);
 
 	} else if (block->frees == pool->block_items && block->block_node.next) {
 		/* never free the first pool-block for buffer */

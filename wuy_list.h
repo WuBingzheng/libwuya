@@ -23,38 +23,56 @@
 #include "wuy_container.h"
 
 /**
- * @brief Embed this node into your data struct in order to use this lib.
- *
- * This can used as list head or node both.
+ * @brief Embed this node into your data struct.
  */
-typedef struct wuy_list_head_s wuy_list_head_t;
+typedef struct wuy_list_node_s wuy_list_node_t;
 
-struct wuy_list_head_s {
-	wuy_list_head_t *next, *prev;
+struct wuy_list_node_s {
+	wuy_list_node_t *next, *prev;
 };
 
 /**
- * @brief Initialize at declare.
+ * @brief The list.
  */
-#define WUY_LIST_HEAD_INIT(name) { &(name), &(name) }
+typedef struct {
+	wuy_list_node_t head;
+} wuy_list_t;
 
 /**
- * @brief Declare and initialize.
+ * @brief Initialize a node at declare.
  */
-#define WUY_LIST_HEAD(name) \
-	wuy_list_head_t name = WUY_LIST_HEAD_INIT(name)
+#define WUY_LIST_NODE_INIT(name) { &(name), &(name) }
 
 /**
- * @brief Initialize a head or node.
+ * @brief Initialize a list at declare.
  */
-static inline void wuy_list_init(wuy_list_head_t *head)
+#define WUY_LIST_INIT(name) { .head = WUY_LIST_NODE_INIT(name.head) }
+
+/**
+ * @brief Declare and initialize a list.
+ */
+#define WUY_LIST(name) \
+	wuy_list_t name = WUY_LIST_INIT(name)
+
+/**
+ * @brief Initialize a node.
+ */
+static inline void wuy_list_node_init(wuy_list_node_t *node)
 {
-	head->next = head;
-	head->prev = head;
+	node->next = node;
+	node->prev = node;
 }
 
-static inline void _list_add(wuy_list_head_t *node,
-	wuy_list_head_t *prev, wuy_list_head_t *next)
+/**
+ * @brief Initialize a list.
+ */
+static inline void wuy_list_init(wuy_list_t *list)
+{
+	wuy_list_node_init(&list->head);
+}
+
+static inline void _list_add(wuy_list_node_t *node,
+	wuy_list_node_t *prev, wuy_list_node_t *next)
 {
 	node->next = next;
 	node->prev = prev;
@@ -64,25 +82,25 @@ static inline void _list_add(wuy_list_head_t *node,
 }
 
 /**
- * @brief Add node after head.
+ * @brief Insert node to the begin of list.
  */
-static inline void wuy_list_add(wuy_list_head_t *node,
-		wuy_list_head_t *head)
+static inline void wuy_list_insert(wuy_list_t *list,
+		wuy_list_node_t *node)
 {
-	_list_add(node, head, head->next);
+	_list_add(node, &list->head, list->head.next);
 }
 
 /**
- * @brief Add node before head.
+ * @brief Append node to the end of list.
  */
-static inline void wuy_list_add_tail(wuy_list_head_t *node,
-		wuy_list_head_t *head)
+static inline void wuy_list_append(wuy_list_t *list,
+		wuy_list_node_t *node)
 {
-	_list_add(node, head->prev, head);
+	_list_add(node, list->head.prev, &list->head);
 }
 
-static inline void _list_del(wuy_list_head_t *prev,
-		wuy_list_head_t *next)
+static inline void _list_del(wuy_list_node_t *prev,
+		wuy_list_node_t *next)
 {
 	next->prev = prev;
 	prev->next = next;
@@ -91,7 +109,7 @@ static inline void _list_del(wuy_list_head_t *prev,
 /**
  * @brief Delete node from its list.
  */
-static inline void wuy_list_delete(wuy_list_head_t *node)
+static inline void wuy_list_delete(wuy_list_node_t *node)
 {
 	_list_del(node->prev, node->next);
 	node->next = node->prev = NULL;
@@ -100,50 +118,55 @@ static inline void wuy_list_delete(wuy_list_head_t *node)
 /**
  * @brief Delete node from its list, and initialize it.
  */
-static inline void wuy_list_del_init(wuy_list_head_t *node)
+static inline void wuy_list_del_init(wuy_list_node_t *node)
 {
 	_list_del(node->prev, node->next);
-	wuy_list_init(node); 
+	wuy_list_node_init(node); 
 }
 
 /**
  * @brief Return if the list head is empty.
  */
-static inline bool wuy_list_empty(wuy_list_head_t *head)
+static inline bool wuy_list_empty(wuy_list_t *list)
 {
+	wuy_list_node_t *head = &list->head;
 	return head->next == head;
 }
 
 /**
  * @brief Iterate over a list, while it's NOT safe to delete node.
  */
-#define wuy_list_iter(pos, head) \
-	for (pos = (head)->next; pos != (head); pos = pos->next)
+#define wuy_list_iter(list, node) \
+	for (node = (list)->head.next; node != &((list)->head); \
+			node = node->next)
 
 /**
  * @brief Iterate over a list, while it's safe to delete node.
  */
-#define wuy_list_iter_safe(pos, n, head) \
-	for (pos = (head)->next, n = pos->next; pos != (head); \
-		pos = n, n = pos->next)
-
-/**
- * @brief Iterate over a list, always getting the first.
- */
-#define wuy_list_iter_first(pos, head) \
-	while ((pos = (head)->next) != (head))
+#define wuy_list_iter_safe(list, node, next) \
+	for (node = (list)->head.next, next = node->next; \
+			node != &((list)->head); \
+			node = next, next = node->next)
 
 /**
  * @brief Iterate over a list reverse, while it's NOT safe to delete node.
  */
-#define wuy_list_iter_reverse(pos, head) \
-	for (pos = (head)->prev; pos != (head); pos = pos->prev)
+#define wuy_list_iter_reverse(list, node) \
+	for (node = (list)->head.prev; node != &((list)->head); \
+			node = node->prev)
 
 /**
  * @brief Iterate over a list reverse, while it's safe to delete node.
  */
-#define wuy_list_iter_reverse_safe(pos, n, head) \
-	for (pos = (head)->prev, n = pos->prev; pos != (head); \
-		pos = n, n = pos->prev)
+#define wuy_list_iter_reverse_safe(list, node, prev) \
+	for (node = (list)->head.prev, prev = node->prev; \
+			node != &((list)->head); \
+			node = prev, prev = node->prev)
+
+/**
+ * @brief Iterate over a list, always getting the first.
+ */
+#define wuy_list_iter_first(list, node) \
+	while ((node = (list)->head.next) != &((list)->head))
 
 #endif
