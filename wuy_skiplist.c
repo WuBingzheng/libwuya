@@ -284,9 +284,20 @@ void *wuy_skiplist_del_key(wuy_skiplist_t *skiplist, const void *key)
 	return item;
 }
 
-wuy_skiplist_node_t *wuy_skiplist_first(wuy_skiplist_t *skiplist)
+void *wuy_skiplist_first(wuy_skiplist_t *skiplist)
 {
-	return skiplist->header.nexts[0];
+	wuy_skiplist_node_t *node = skiplist->header.nexts[0];
+	return node == NULL ? NULL : _node_to_item(skiplist, node);
+}
+
+void *wuy_skiplist_next(wuy_skiplist_t *skiplist, void *item)
+{
+	if (item == NULL) {
+		return NULL;
+	}
+	wuy_skiplist_node_t *node = _item_to_node(skiplist, item);
+	wuy_skiplist_node_t *next = node->nexts[0];
+	return next == NULL ? NULL : _node_to_item(skiplist, next);
 }
 
 long wuy_skiplist_count(wuy_skiplist_t *skiplist)
