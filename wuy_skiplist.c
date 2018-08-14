@@ -44,11 +44,11 @@ wuy_skiplist_pool_t *wuy_skiplist_pool_new(int max)
 
 static wuy_skiplist_t *wuy_skiplist_new(size_t node_offset, wuy_skiplist_pool_t *skpool)
 {
-	wuy_skiplist_t *skiplist = malloc(sizeof(wuy_skiplist_t)
-			+ sizeof(wuy_skiplist_node_t *) * skpool->max);
+	size_t size = sizeof(wuy_skiplist_t) + sizeof(wuy_skiplist_node_t *) * skpool->max;
+	wuy_skiplist_t *skiplist = malloc(size);
 	assert(skiplist != NULL);
 
-	bzero(&skiplist->header, sizeof(wuy_skiplist_node_t *) * skpool->max);
+	bzero(skiplist, size);
 	skiplist->skpool = skpool;
 	skiplist->node_offset = node_offset;
 	return skiplist;
@@ -74,6 +74,14 @@ wuy_skiplist_t *wuy_skiplist_new_type(wuy_skiplist_key_type_e key_type,
 	return skiplist;
 }
 
+static const void *_key_to_item(wuy_skiplist_t *skiplist, const void *key)
+{
+	return (const char *)key - skiplist->key_offset;
+}
+static const void *_item_to_key(wuy_skiplist_t *skiplist, const void *item)
+{
+	return (const char *)item + skiplist->key_offset;
+}
 static wuy_skiplist_node_t *_item_to_node(wuy_skiplist_t *skiplist, const void *item)
 {
 	return (wuy_skiplist_node_t *)((char *)item + skiplist->node_offset);
@@ -89,28 +97,31 @@ static bool wuy_skiplist_less(wuy_skiplist_t *skiplist, const void *a, const voi
 		return skiplist->key_less(a, b);
 	}
 
+	const void *keya = _item_to_key(skiplist, a);
+	const void *keyb = _item_to_key(skiplist, b);
+
 	bool ret;
 	switch (skiplist->key_type) {
 	case WUY_SKIPLIST_KEY_INT32:
-		ret = *(const int32_t *)a < *(const int32_t *)b;
+		ret = *(const int32_t *)keya < *(const int32_t *)keyb;
 		break;
 	case WUY_SKIPLIST_KEY_UINT32:
-		ret = *(const uint32_t *)a < *(const uint32_t *)b;
+		ret = *(const uint32_t *)keya < *(const uint32_t *)keyb;
 		break;
 	case WUY_SKIPLIST_KEY_INT64:
-		ret = *(const int64_t *)a < *(const int64_t *)b;
+		ret = *(const int64_t *)keya < *(const int64_t *)keyb;
 		break;
 	case WUY_SKIPLIST_KEY_UINT64:
-		ret = *(const uint64_t *)a < *(const uint64_t *)b;
+		ret = *(const uint64_t *)keya < *(const uint64_t *)keyb;
 		break;
 	case WUY_SKIPLIST_KEY_FLOAT:
-		ret = *(const float *)a < *(const float *)b;
+		ret = *(const float *)keya < *(const float *)keyb;
 		break;
 	case WUY_SKIPLIST_KEY_DOUBLE:
-		ret = *(const double *)a < *(const double *)b;
+		ret = *(const double *)keya < *(const double *)keyb;
 		break;
 	case WUY_SKIPLIST_KEY_STRING:
-		ret = strcmp(a, b) < 0;
+		ret = strcmp(keya, keyb) < 0;
 		break;
 	default:
 		abort();
@@ -256,23 +267,28 @@ static void *wuy_skiplist_search_key(wuy_skiplist_t *skiplist,
 		return NULL;
 	}
 
-	wuy_skiplist_get_previous(skiplist, previous, key);
+	const void *key_item = key;
+	if (skiplist->key_less == NULL) {
+		key_item = _key_to_item(skiplist, &key);
+	}
+
+	wuy_skiplist_get_previous(skiplist, previous, key_item);
 
 	void *item = _node_to_item(skiplist, previous[0]->nexts[0]);
-	if (wuy_skiplist_less(skiplist, key, item)) {
+	if (wuy_skiplist_less(skiplist, key_item, item)) {
 		return NULL;
 	}
 
 	return item;
 }
 
-void *wuy_skiplist_search(wuy_skiplist_t *skiplist, const void *key)
+void *_wuy_skiplist_search(wuy_skiplist_t *skiplist, const void *key)
 {
 	wuy_skiplist_node_t *previous[skiplist->skpool->max];
 	return wuy_skiplist_search_key(skiplist, previous, key);
 }
 
-void *wuy_skiplist_del_key(wuy_skiplist_t *skiplist, const void *key)
+void *_wuy_skiplist_del_key(wuy_skiplist_t *skiplist, const void *key)
 {
 	wuy_skiplist_node_t *previous[skiplist->skpool->max];
 	void *item = wuy_skiplist_search_key(skiplist, previous, key);

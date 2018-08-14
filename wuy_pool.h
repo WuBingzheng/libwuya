@@ -14,6 +14,8 @@
 #ifndef WUY_POOL_H
 #define WUY_POOL_H
 
+#include <stddef.h>
+
 /**
  * @brief The memory pool.
  *

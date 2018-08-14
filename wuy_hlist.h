@@ -104,6 +104,6 @@ static inline void wuy_hlist_delete(wuy_hlist_node_t *node)
  */
 #define wuy_hlist_iter_safe(head, pos, n) \
 	for (pos = (head)->first, n = pos?pos->next:NULL; pos; \
-		pos = pos->next, n = pos?pos->next:NULL)
+		pos = n, n = pos?pos->next:NULL)
 
 #endif

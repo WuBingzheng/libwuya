@@ -95,7 +95,6 @@ again:
 		return client_fd;
 	}
 	int ret = fcntl(client_fd, F_SETFL, fcntl(client_fd, F_GETFL) | O_NONBLOCK); // XXX
-	printf("set nonblock %d\n", ret);
 	return client_fd;
 }
 

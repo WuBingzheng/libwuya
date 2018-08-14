@@ -2,6 +2,7 @@
 #define WUY_SKIPLIST_H
 
 #include <stdbool.h>
+#include <stdint.h>
 #include "wuy_container.h"
 
 typedef struct wuy_skiplist_pool_s wuy_skiplist_pool_t;
@@ -49,9 +50,13 @@ bool wuy_skiplist_insert(wuy_skiplist_t *skiplist, void *item);
 
 bool wuy_skiplist_delete(wuy_skiplist_t *skiplist, void *item);
 
-void *wuy_skiplist_search(wuy_skiplist_t *skiplist, const void *key);
+#define wuy_skiplist_search(skiplist, key) \
+	_wuy_skiplist_search(skiplist, (const void *)(uintptr_t)key)
+void *_wuy_skiplist_search(wuy_skiplist_t *skiplist, const void *key);
 
-void *wuy_skiplist_del_key(wuy_skiplist_t *skiplist, const void *key);
+#define wuy_skiplist_del_key(skiplist, key) \
+	_wuy_skiplist_del_key(skiplist, (const void *)(uintptr_t)key)
+void *_wuy_skiplist_del_key(wuy_skiplist_t *skiplist, const void *key);
 
 long wuy_skiplist_count(wuy_skiplist_t *skiplist);
 
@@ -63,7 +68,8 @@ void *wuy_skiplist_next(wuy_skiplist_t *skiplist, void *item);
 			item = wuy_skiplist_next(skiplist, item))
 
 #define wuy_skiplist_iter_safe(skiplist, item, next) \
-	for (item = wuy_skiplist_first(skiplist), next = wuy_skiplist_next(skiplist, item); \
+	for (item = wuy_skiplist_first(skiplist), \
+			next = wuy_skiplist_next(skiplist, item); \
 			item != NULL; \
 			item = next, next = wuy_skiplist_next(skiplist, item))
 

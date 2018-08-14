@@ -2,14 +2,17 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include <strings.h>
 #include <assert.h>
 
 #include "wuy_dict.h"
 
 struct wuy_dict_s {
-	wuy_dict_hash_f		*hash;
-	wuy_dict_equal_f	*equal;
+	wuy_dict_hash_f		*key_hash;
+	wuy_dict_equal_f	*key_equal;
+	wuy_dict_key_type_e	key_type;
+	size_t			key_offset;
 
 	wuy_hlist_head_t	*buckets;
 	wuy_hlist_head_t	*prev_buckets;
@@ -25,11 +28,10 @@ struct wuy_dict_s {
 };
 
 #define WUY_DICT_SIZE_INIT		64
-#define WUY_DICT_SIZE_MAX		64*1024*1024
+#define WUY_DICT_SIZE_MAX		(64*1024*1024)
 #define WUY_DICT_EXPANSION_FACTOR	2
 
-wuy_dict_t *wuy_dict_new(wuy_dict_hash_f *hash, wuy_dict_equal_f *equal,
-		size_t node_offset)
+static wuy_dict_t *wuy_dict_new(size_t node_offset)
 {
 	wuy_dict_t *dict = malloc(sizeof(wuy_dict_t));
 	assert(dict != NULL);
@@ -38,14 +40,33 @@ wuy_dict_t *wuy_dict_new(wuy_dict_hash_f *hash, wuy_dict_equal_f *equal,
 	dict->buckets = calloc(dict->bucket_size, sizeof(wuy_hlist_head_t));
 	assert(dict->buckets != NULL);
 
-	dict->hash = hash;
-	dict->equal = equal;
 	dict->node_offset = node_offset;
-
 	dict->count = 0;
 	dict->split = 0;
 	dict->prev_buckets = NULL;
 	dict->expansion = true;
+	return dict;
+}
+
+wuy_dict_t *wuy_dict_new_func(wuy_dict_hash_f *key_hash,
+		wuy_dict_equal_f *key_equal, size_t node_offset)
+{
+	wuy_dict_t *dict = wuy_dict_new(node_offset);
+	dict->key_hash = key_hash;
+	dict->key_equal = key_equal;
+	dict->key_type = 100;
+	dict->key_offset = 0;
+	return dict;
+}
+
+wuy_dict_t *wuy_dict_new_type(wuy_dict_key_type_e key_type,
+		size_t key_offset, size_t node_offset)
+{
+	wuy_dict_t *dict = wuy_dict_new(node_offset);
+	dict->key_hash = NULL;
+	dict->key_equal = NULL;
+	dict->key_type = key_type;
+	dict->key_offset = key_offset;
 	return dict;
 }
 
@@ -73,6 +94,10 @@ void wuy_dict_disable_expasion(wuy_dict_t *dict, uint32_t bucket_size)
 	bzero(dict->buckets, align * sizeof(wuy_hlist_head_t));
 }
 
+static const void *_item_to_key(wuy_dict_t *dict, const void *item)
+{
+	return (const char *)item + dict->key_offset;
+}
 static wuy_hlist_node_t *_item_to_node(wuy_dict_t *dict, const void *item)
 {
 	return (wuy_hlist_node_t *)((char *)item + dict->node_offset);
@@ -82,9 +107,67 @@ static void *_node_to_item(wuy_dict_t *dict, wuy_hlist_node_t *node)
 	return (char *)node - dict->node_offset;
 }
 
-static uint32_t wuy_dict_index(wuy_dict_t *dict, const void *item)
+static uint32_t wuy_dict_hash_key(wuy_dict_t *dict, const void *key)
 {
-	return dict->hash(item) & (dict->bucket_size - 1);
+	if (dict->key_hash != NULL) {
+		return dict->key_hash(key);
+	}
+
+	switch (dict->key_type) {
+	case WUY_DICT_KEY_UINT32:
+		return (uint32_t)(uintptr_t)key;
+	case WUY_DICT_KEY_UINT64:
+		return (uint64_t)key;
+	case WUY_DICT_KEY_STRING:
+		return wuy_dict_hash_string(key);
+	default:
+		abort();
+	}
+}
+static uint32_t wuy_dict_hash_item(wuy_dict_t *dict, const void *item)
+{
+	if (dict->key_hash != NULL) {
+		return dict->key_hash(item);
+	}
+
+	const void *item_key = _item_to_key(dict, item);
+	switch (dict->key_type) {
+	case WUY_DICT_KEY_UINT32:
+		return *(uint32_t *)item_key;
+	case WUY_DICT_KEY_UINT64:
+		return (uint32_t)(*(uint64_t *)item_key);
+	case WUY_DICT_KEY_STRING:
+		return wuy_dict_hash_string(*(const char **)item_key);
+	default:
+		abort();
+	}
+}
+static uint32_t wuy_dict_index_key(wuy_dict_t *dict, const void *key)
+{
+	return wuy_dict_hash_key(dict, key) & (dict->bucket_size - 1);
+}
+static uint32_t wuy_dict_index_item(wuy_dict_t *dict, const void *item)
+{
+	return wuy_dict_hash_item(dict, item) & (dict->bucket_size - 1);
+}
+
+static bool wuy_dict_equal_key(wuy_dict_t *dict, const void *item, const void *key)
+{
+	if (dict->key_equal != NULL) {
+		return dict->key_equal(item, key);
+	}
+
+	const void *item_key = _item_to_key(dict, item);
+	switch (dict->key_type) {
+	case WUY_DICT_KEY_UINT32:
+		return *(uint32_t *)item_key == (uint32_t)(uintptr_t)key;
+	case WUY_DICT_KEY_UINT64:
+		return *(uint64_t *)item_key == (uint64_t)key;
+	case WUY_DICT_KEY_STRING:
+		return strcmp(*(const char **)item_key, key) == 0;
+	default:
+		abort();
+	}
 }
 
 static void wuy_dict_expasion(wuy_dict_t *dict)
@@ -116,7 +199,8 @@ static void wuy_dict_expasion(wuy_dict_t *dict)
 		wuy_hlist_node_t *node, *safe;
 		wuy_hlist_iter_safe(&dict->prev_buckets[dict->split], node, safe) {
 			void *item = _node_to_item(dict, node);
-			wuy_hlist_insert(&dict->buckets[wuy_dict_index(dict, item)], node);
+			uint32_t index = wuy_dict_index_item(dict, item);
+			wuy_hlist_insert(&dict->buckets[index], node);
 		}
 
 		dict->split++;
@@ -130,24 +214,24 @@ static void wuy_dict_expasion(wuy_dict_t *dict)
 
 void wuy_dict_add(wuy_dict_t *dict, void *item)
 {
-	uint32_t index = wuy_dict_index(dict, item);
+	uint32_t index = wuy_dict_index_item(dict, item);
 	wuy_hlist_insert(&dict->buckets[index], _item_to_node(dict, item));
 
 	dict->count++;
 	wuy_dict_expasion(dict);
 }
 
-void *wuy_dict_get(wuy_dict_t *dict, const void *key)
+void *_wuy_dict_get(wuy_dict_t *dict, const void *key)
 {
 	wuy_dict_expasion(dict);
 
-	uint32_t index = wuy_dict_index(dict, key);
+	uint32_t index = wuy_dict_index_key(dict, key);
 
 	/* search from dict->buckets */
 	wuy_hlist_node_t *node;
 	wuy_hlist_iter(&dict->buckets[index], node) {
 		void *item = _node_to_item(dict, node);
-		if (dict->equal(item, key)) {
+		if (wuy_dict_equal_key(dict, item, key)) {
 			return item;
 		}
 	}
@@ -160,7 +244,7 @@ void *wuy_dict_get(wuy_dict_t *dict, const void *key)
 		}
 		wuy_hlist_iter(&dict->prev_buckets[index], node) {
 			void *item = _node_to_item(dict, node);
-			if (dict->equal(item, key)) {
+			if (wuy_dict_equal_key(dict, item, key)) {
 				return item;
 			}
 		}

@@ -54,16 +54,39 @@ typedef uint32_t wuy_dict_hash_f(const void *item);
 typedef bool wuy_dict_equal_f(const void *a, const void *b);
 
 /**
- * @brief Create a dict.
+ * @brief List of key type.
  *
- * @param hash return a 32 bit hash value for the key of item.
- * @param equal return if 2 items have the same key, used for searching.
+ * Used in wuy_dict_new_type().
+ */
+typedef enum {
+	WUY_DICT_KEY_UINT32,
+	WUY_DICT_KEY_UINT64,
+	WUY_DICT_KEY_STRING,
+} wuy_dict_key_type_e;
+
+/**
+ * @brief Create a dict, with the user-defined key hash/equal function.
+ *
+ * @param key_hash return a 32 bit hash value for the key of item.
+ * @param key_equal return if 2 items have the same key, used for searching.
  * @param node_offset the offset of wuy_dict_node_t in your data struct.
  *
  * @return the new dict. It aborts the program if memory allocation fails.
  */
-wuy_dict_t *wuy_dict_new(wuy_dict_hash_f *hash, wuy_dict_equal_f *equal,
-		size_t node_offset);
+wuy_dict_t *wuy_dict_new_func(wuy_dict_hash_f *key_hash,
+		wuy_dict_equal_f *key_equal, size_t node_offset);
+
+/**
+ * @brief Create a dict, with general key type.
+ *
+ * @param key_type see wuy_dict_key_type_e.
+ * @param key_offset the offset of key in your data struct.
+ * @param node_offset the offset of wuy_dict_node_t in your data struct.
+ *
+ * @return the new dict. It aborts the program if memory allocation fails.
+ */
+wuy_dict_t *wuy_dict_new_type(wuy_dict_key_type_e key_type,
+		size_t key_offset, size_t node_offset);
 
 /**
  * @brief Destroy a dict.
@@ -80,9 +103,21 @@ void wuy_dict_add(wuy_dict_t *dict, void *item);
 /**
  * @brief Search item from dict by the key.
  *
+ * @param key If the dict is created by wuy_dict_new_func(), then
+ * the \b key should be a pointer pointing to your data struct
+ * with search key. Otherwise if the dict is created by
+ * wuy_dict_new_type(), then the \b key should be the key in your type.
+ *
  * @return the item if found, or NULL.
  */
-void *wuy_dict_get(wuy_dict_t *dict, const void *key);
+#define wuy_dict_get(dict, key) _wuy_dict_get(dict, (const void *)(uintptr_t)key)
+
+/**
+ * @brief Used by macro wuy_dict_get.
+ *
+ * You should not use this directly.
+ */
+void *_wuy_dict_get(wuy_dict_t *dict, const void *key);
 
 /**
  * @brief Delete the item from dict.
