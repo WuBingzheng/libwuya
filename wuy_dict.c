@@ -260,7 +260,7 @@ void wuy_dict_delete(wuy_dict_t *dict, void *item)
 	dict->count--;
 }
 
-void *wuy_dict_del_key(wuy_dict_t *dict, const void *key)
+void *_wuy_dict_del_key(wuy_dict_t *dict, const void *key)
 {
 	void *item = wuy_dict_get(dict, key);
 	if (item == NULL) {

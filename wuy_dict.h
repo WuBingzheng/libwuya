@@ -112,11 +112,7 @@ void wuy_dict_add(wuy_dict_t *dict, void *item);
  */
 #define wuy_dict_get(dict, key) _wuy_dict_get(dict, (const void *)(uintptr_t)key)
 
-/**
- * @brief Used by macro wuy_dict_get.
- *
- * You should not use this directly.
- */
+/* Used by macro wuy_dict_get. You should not use this directly. */
 void *_wuy_dict_get(wuy_dict_t *dict, const void *key);
 
 /**
@@ -138,7 +134,10 @@ void wuy_dict_delete(wuy_dict_t *dict, void *item);
  *
  * @return the item if found, or NULL.
  */
-void *wuy_dict_del_key(wuy_dict_t *dict, const void *key);
+#define wuy_dict_del_key(dict, key) _wuy_dict_del_key(dict, (const void *)(uintptr_t)key)
+
+/* Used by macro wuy_dict_del_key. You should not use this directly. */
+void *_wuy_dict_del_key(wuy_dict_t *dict, const void *key);
 
 /**
  * @brief Unlink the node from its dict, while you need not
