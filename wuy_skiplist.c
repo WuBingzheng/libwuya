@@ -300,20 +300,29 @@ void *_wuy_skiplist_del_key(wuy_skiplist_t *skiplist, const void *key)
 	return item;
 }
 
-void *wuy_skiplist_first(wuy_skiplist_t *skiplist)
+wuy_skiplist_node_t *wuy_skiplist_iter_new(wuy_skiplist_t *skiplist)
 {
-	wuy_skiplist_node_t *node = skiplist->header.nexts[0];
-	return node == NULL ? NULL : _node_to_item(skiplist, node);
+	return skiplist->header.nexts[0];
 }
 
-void *wuy_skiplist_next(wuy_skiplist_t *skiplist, void *item)
+void *wuy_skiplist_iter_next(wuy_skiplist_t *skiplist, wuy_skiplist_node_t **iter)
 {
-	if (item == NULL) {
+	wuy_skiplist_node_t *next = *iter;
+	if (next == NULL) {
 		return NULL;
 	}
-	wuy_skiplist_node_t *node = _item_to_node(skiplist, item);
-	wuy_skiplist_node_t *next = node->nexts[0];
-	return next == NULL ? NULL : _node_to_item(skiplist, next);
+	*iter = next->nexts[0];
+	return _node_to_item(skiplist, next);
+}
+
+bool wuy_skiplist_iter_less(wuy_skiplist_t *skiplist,
+		const void *item, const void *stop_key)
+{
+	const void *stop_item = stop_key;
+	if (skiplist->key_less == NULL) {
+		stop_item = _key_to_item(skiplist, &stop_key);
+	}
+	return wuy_skiplist_less(skiplist, item, stop_item);
 }
 
 long wuy_skiplist_count(wuy_skiplist_t *skiplist)

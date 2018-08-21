@@ -60,17 +60,18 @@ void *_wuy_skiplist_del_key(wuy_skiplist_t *skiplist, const void *key);
 
 long wuy_skiplist_count(wuy_skiplist_t *skiplist);
 
-void *wuy_skiplist_first(wuy_skiplist_t *skiplist);
-void *wuy_skiplist_next(wuy_skiplist_t *skiplist, void *item);
+wuy_skiplist_node_t *wuy_skiplist_iter_new(wuy_skiplist_t *skiplist);
+void *wuy_skiplist_iter_next(wuy_skiplist_t *skiplist, wuy_skiplist_node_t **iter);
+bool wuy_skiplist_iter_less(wuy_skiplist_t *skiplist,
+		const void *item, const void *stop_key);
 
 #define wuy_skiplist_iter(skiplist, item) \
-	for (item = wuy_skiplist_first(skiplist); item != NULL; \
-			item = wuy_skiplist_next(skiplist, item))
+	for (wuy_skiplist_node_t *_sk_iter = wuy_skiplist_iter_new(skiplist); \
+		(item = wuy_skiplist_iter_next(skiplist, &_sk_iter)) != NULL; )
 
-#define wuy_skiplist_iter_safe(skiplist, item, next) \
-	for (item = wuy_skiplist_first(skiplist), \
-			next = wuy_skiplist_next(skiplist, item); \
-			item != NULL; \
-			item = next, next = wuy_skiplist_next(skiplist, item))
+#define wuy_skiplist_iter_stop(skiplist, item, stop) \
+	for (wuy_skiplist_node_t *_sk_iter = wuy_skiplist_iter_new(skiplist); \
+		(item = wuy_skiplist_iter_next(skiplist, &_sk_iter)) != NULL \
+			&& wuy_skiplist_iter_less(skiplist, item, stop); )
 
 #endif
