@@ -143,10 +143,10 @@ static inline bool wuy_list_empty(wuy_list_t *list)
 /**
  * @brief Iterate over a list, while it's safe to delete node.
  */
-#define wuy_list_iter_safe(list, node, next) \
-	for (node = (list)->head.next, next = node->next; \
+#define wuy_list_iter_safe(list, node, safe) \
+	for (node = (list)->head.next, safe = node->next; \
 			node != &((list)->head); \
-			node = next, next = node->next)
+			node = safe, safe = node->next)
 
 /**
  * @brief Iterate over a list reverse, while it's NOT safe to delete node.
@@ -158,10 +158,10 @@ static inline bool wuy_list_empty(wuy_list_t *list)
 /**
  * @brief Iterate over a list reverse, while it's safe to delete node.
  */
-#define wuy_list_iter_reverse_safe(list, node, prev) \
-	for (node = (list)->head.prev, prev = node->prev; \
+#define wuy_list_iter_reverse_safe(list, node, safe) \
+	for (node = (list)->head.prev, safe = node->prev; \
 			node != &((list)->head); \
-			node = prev, prev = node->prev)
+			node = safe, safe = node->prev)
 
 /**
  * @brief Iterate over a list, always getting the first.
