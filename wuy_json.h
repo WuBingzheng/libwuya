@@ -17,6 +17,7 @@ typedef struct {
 	wuy_json_ctx_t name = WUY_JSON_CTX_INIT(buf, size)
 
 #define WUY_JSON_BUILD(ctx, fmt, ...) \
+	if (ctx->pos >= ctx->end) return; \
 	ctx->pos += snprintf(ctx->pos, ctx->end - ctx->pos, fmt, ## __VA_ARGS__)
 
 static inline void wuy_json_ctx_init(wuy_json_ctx_t *ctx, char *buf, size_t size)
@@ -37,6 +38,9 @@ static inline void wuy_json_new_array(wuy_json_ctx_t *ctx)
 
 static inline void wuy_json_object_close(wuy_json_ctx_t *ctx)
 {
+	if (ctx->pos >= ctx->end) {
+		return;
+	}
 	switch (ctx->pos[-1]) {
 	case ',':
 		ctx->pos--;
@@ -50,6 +54,9 @@ static inline void wuy_json_object_close(wuy_json_ctx_t *ctx)
 
 static inline void wuy_json_array_close(wuy_json_ctx_t *ctx)
 {
+	if (ctx->pos >= ctx->end) {
+		return;
+	}
 	switch (ctx->pos[-1]) {
 	case ',':
 		ctx->pos--;
@@ -63,6 +70,10 @@ static inline void wuy_json_array_close(wuy_json_ctx_t *ctx)
 
 static inline int wuy_json_done(wuy_json_ctx_t *ctx)
 {
+	if (ctx->pos > ctx->end) {
+		return ctx->end - ctx->start;
+	}
+
 	if (ctx->pos[-1] != ',') {
 		abort();
 	}
