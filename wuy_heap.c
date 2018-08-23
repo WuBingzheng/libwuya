@@ -38,6 +38,8 @@ wuy_heap_t *wuy_heap_new_func(wuy_heap_less_f *key_less, size_t node_offset)
 {
 	wuy_heap_t *heap = wuy_heap_new(node_offset);
 	heap->key_less = key_less;
+	heap->key_type = 100;
+	heap->key_offset = 0;
 	return heap;
 }
 

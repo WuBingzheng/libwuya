@@ -59,6 +59,8 @@ wuy_skiplist_t *wuy_skiplist_new_func(wuy_skiplist_less_f *key_less,
 {
 	wuy_skiplist_t *skiplist = wuy_skiplist_new(node_offset, skpool);
 	skiplist->key_less = key_less;
+	skiplist->key_type = 100;
+	skiplist->key_offset = 0;
 	return skiplist;
 }
 
