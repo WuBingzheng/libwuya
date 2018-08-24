@@ -327,6 +327,12 @@ bool wuy_skiplist_iter_less(wuy_skiplist_t *skiplist,
 	return wuy_skiplist_less(skiplist, item, stop_item);
 }
 
+void *wuy_skiplist_first(wuy_skiplist_t *skiplist)
+{
+	wuy_skiplist_node_t *node = skiplist->header.nexts[0];
+	return node != NULL ? _node_to_item(skiplist, node) : NULL;
+}
+
 long wuy_skiplist_count(wuy_skiplist_t *skiplist)
 {
 	return skiplist->count;

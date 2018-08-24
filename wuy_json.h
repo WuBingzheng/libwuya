@@ -2,6 +2,7 @@
 #define WUY_JSON_H
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
 typedef struct {
@@ -101,13 +102,9 @@ static inline void wuy_json_object_null(wuy_json_ctx_t *ctx, const char *key)
 {
 	WUY_JSON_BUILD(ctx, "\"%s\":null,", key);
 }
-static inline void wuy_json_object_true(wuy_json_ctx_t *ctx, const char *key)
+static inline void wuy_json_object_bool(wuy_json_ctx_t *ctx, const char *key, bool b)
 {
-	WUY_JSON_BUILD(ctx, "\"%s\":true,", key);
-}
-static inline void wuy_json_object_false(wuy_json_ctx_t *ctx, const char *key)
-{
-	WUY_JSON_BUILD(ctx, "\"%s\":false,", key);
+	WUY_JSON_BUILD(ctx, "\"%s\":%s,", key, b ? "true" : "false");
 }
 static inline void wuy_json_object_array(wuy_json_ctx_t *ctx, const char *key)
 {
@@ -138,13 +135,9 @@ static inline void wuy_json_array_null(wuy_json_ctx_t *ctx)
 {
 	WUY_JSON_BUILD(ctx, "null,");
 }
-static inline void wuy_json_array_true(wuy_json_ctx_t *ctx)
+static inline void wuy_json_array_bool(wuy_json_ctx_t *ctx, bool b)
 {
-	WUY_JSON_BUILD(ctx, "true,");
-}
-static inline void wuy_json_array_false(wuy_json_ctx_t *ctx)
-{
-	WUY_JSON_BUILD(ctx, "false,");
+	WUY_JSON_BUILD(ctx, b ? "true," : "false,");
 }
 static inline void wuy_json_array_array(wuy_json_ctx_t *ctx)
 {

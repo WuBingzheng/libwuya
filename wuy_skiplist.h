@@ -74,4 +74,8 @@ bool wuy_skiplist_iter_less(wuy_skiplist_t *skiplist,
 		(item = wuy_skiplist_iter_next(skiplist, &_sk_iter)) != NULL \
 			&& wuy_skiplist_iter_less(skiplist, item, stop); )
 
+void *wuy_skiplist_first(wuy_skiplist_t *skiplist);
+#define wuy_skiplist_iter_first(skiplist, item) \
+	while ((item = wuy_skiplist_first(skiplist)) != NULL)
+
 #endif
