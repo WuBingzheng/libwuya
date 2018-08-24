@@ -127,10 +127,18 @@ static inline void wuy_list_del_init(wuy_list_node_t *node)
 /**
  * @brief Return if the list head is empty.
  */
-static inline bool wuy_list_empty(wuy_list_t *list)
+static inline bool wuy_list_empty(const wuy_list_t *list)
 {
-	wuy_list_node_t *head = &list->head;
+	const wuy_list_node_t *head = &list->head;
 	return head->next == head;
+}
+
+/**
+ * @brief Return first node, or NULL if empty.
+ */
+static inline wuy_list_node_t *wuy_list_first(const wuy_list_t *list)
+{
+	return wuy_list_empty(list) ? NULL : list->head.next;
 }
 
 /**
