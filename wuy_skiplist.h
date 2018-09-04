@@ -72,7 +72,7 @@ bool wuy_skiplist_iter_less(wuy_skiplist_t *skiplist,
 #define wuy_skiplist_iter_stop(skiplist, item, stop) \
 	for (wuy_skiplist_node_t *_sk_iter = wuy_skiplist_iter_new(skiplist); \
 		(item = wuy_skiplist_iter_next(skiplist, &_sk_iter)) != NULL \
-			&& wuy_skiplist_iter_less(skiplist, item, stop); )
+			&& (stop == NULL || wuy_skiplist_iter_less(skiplist, item, stop)); )
 
 void *wuy_skiplist_first(wuy_skiplist_t *skiplist);
 #define wuy_skiplist_iter_first(skiplist, item) \
