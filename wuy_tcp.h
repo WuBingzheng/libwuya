@@ -28,7 +28,8 @@ static inline int wuy_tcp_set_sndbuf(int fd, int value)
 }
 static inline int wuy_tcp_get_sndbuf(int fd)
 {
-	int value, size = sizeof(int);
+	int value;
+	socklen_t size = sizeof(int);
 	getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &value, &size);
 	return value;
 }
@@ -38,7 +39,8 @@ static inline int wuy_tcp_set_rcvbuf(int fd, int value)
 }
 static inline int wuy_tcp_get_rcvbuf(int fd)
 {
-	int value, size = sizeof(int);
+	int value;
+	socklen_t size = sizeof(int);
 	getsockopt(fd, SOL_SOCKET, SO_RCVBUF, &value, &size);
 	return value;
 }
