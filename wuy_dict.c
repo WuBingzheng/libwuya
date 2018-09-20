@@ -276,7 +276,7 @@ void *_wuy_dict_del_key(wuy_dict_t *dict, const void *key)
  * before. Besides, you MUST NOT call wuy_dict_count()
  * which also use dict->count.
  */
-void wuy_dict_del_node(wuy_hlist_node_t *node)
+void wuy_dict_del_node(wuy_dict_node_t *node)
 {
 	wuy_hlist_delete(node);
 }
@@ -284,4 +284,20 @@ void wuy_dict_del_node(wuy_hlist_node_t *node)
 size_t wuy_dict_count(wuy_dict_t *dict)
 {
 	return dict->count;
+}
+
+bool _wuy_dict_iter_buckets(wuy_dict_t *dict, wuy_hlist_head_t **start,
+		wuy_hlist_head_t **end)
+{
+	if (*start == NULL) {
+		*start = dict->buckets;
+		*end = dict->buckets + dict->bucket_size;
+		return true;
+	}
+	if (dict->prev_buckets != NULL && *start == dict->buckets) {
+		*start = dict->prev_buckets + dict->split;
+		*end = dict->prev_buckets + dict->bucket_size / 2;
+		return true;
+	}
+	return false;
 }
