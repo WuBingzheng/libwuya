@@ -37,6 +37,7 @@ struct wuy_pool_s {
 	size_t			item_size;
 };
 
+/* keep this fail to align by 16 */
 typedef struct {
 	wuy_hlist_node_t	block_node;
 	wuy_hlist_head_t	item_head;
@@ -53,6 +54,13 @@ wuy_pool_t *wuy_pool_new(size_t item_size)
 {
 	wuy_pool_t *pool = malloc(sizeof(wuy_pool_t));
 	assert(pool != NULL);
+
+	item_size = (item_size + 7) / 8 * 8; /* align by 8 */
+
+	/* make sure returned address is aligned by 16 */
+	if ((item_size & 0xF) == 0) {
+		item_size += 8;
+	}
 
 	assert(item_size >= sizeof(wuy_hlist_node_t));
 	pool->item_size = item_size;
