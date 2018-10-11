@@ -194,7 +194,7 @@ static inline uint32_t wuy_dict_hash_string(const char *str)
 static inline uint32_t wuy_dict_hash_pointer(const void *p)
 {
 	uintptr_t n = (uintptr_t)p;
-	return (uint32_t)(n >> 3) * 2654435761;
+	return (uint32_t)(n >> 4) * 2654435761;
 }
 
 #endif
