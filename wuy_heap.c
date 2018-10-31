@@ -134,16 +134,19 @@ static void wuy_heapify_down(wuy_heap_t *heap, size_t i)
 	while (1) {
 		size_t left = i * 2 + 1;
 		size_t right = left + 1;
+		size_t swap = i;
 
-		if (left < heap->count && wuy_heap_less(heap, left, i)) {
-			wuy_heap_swap(heap, left, i);
-			i = left;
-		} else if (right < heap->count && wuy_heap_less(heap, right, i)) {
-			wuy_heap_swap(heap, right, i);
-			i = right;
-		} else {
+		if (left < heap->count && wuy_heap_less(heap, left, swap)) {
+			swap = left;
+		}
+		if (right < heap->count && wuy_heap_less(heap, right, swap)) {
+			swap = right;
+		}
+		if (swap == i) {
 			break;
 		}
+		wuy_heap_swap(heap, i, swap);
+		i = swap;
 	}
 }
 
