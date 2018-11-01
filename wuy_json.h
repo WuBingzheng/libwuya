@@ -98,6 +98,10 @@ static inline void wuy_json_object_string(wuy_json_ctx_t *ctx, const char *key, 
 {
 	WUY_JSON_BUILD(ctx, "\"%s\":\"%s\",", key, s);
 }
+static inline void wuy_json_object_raw_string(wuy_json_ctx_t *ctx, const char *key, const char *s)
+{
+	WUY_JSON_BUILD(ctx, "\"%s\":%s,", key, s);
+}
 static inline void wuy_json_object_null(wuy_json_ctx_t *ctx, const char *key)
 {
 	WUY_JSON_BUILD(ctx, "\"%s\":null,", key);
@@ -130,6 +134,10 @@ static inline void wuy_json_array_double(wuy_json_ctx_t *ctx, double n)
 static inline void wuy_json_array_string(wuy_json_ctx_t *ctx, const char *s)
 {
 	WUY_JSON_BUILD(ctx, "\"%s\",", s);
+}
+static inline void wuy_json_array_raw_string(wuy_json_ctx_t *ctx, const char *s)
+{
+	WUY_JSON_BUILD(ctx, "%s,", s);
 }
 static inline void wuy_json_array_null(wuy_json_ctx_t *ctx)
 {
