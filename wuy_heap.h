@@ -44,6 +44,11 @@ typedef struct {
 typedef bool wuy_heap_less_f(const void *, const void *);
 
 /**
+ * @brief Update item during rebuild.
+ */
+typedef void wuy_heap_update_f(void *);
+
+/**
  * @brief List of your item's comparison key type.
  *
  * Used in wuy_heap_new_type().
@@ -108,6 +113,16 @@ void wuy_heap_fix(wuy_heap_t *heap, void *item);
  * @return true if success, or false if memory allocation fails.
  */
 bool wuy_heap_push_or_fix(wuy_heap_t *heap, void *item);
+
+/**
+ * @brief Re-build the heap.
+ */
+void wuy_heap_rebuild(wuy_heap_t *heap);
+
+/**
+ * @brief Set key-update function during rebuild.
+ */
+void wuy_heap_set_rebuild_update(wuy_heap_t *heap, wuy_heap_update_f *f);
 
 /**
  * @brief Return the min item but not delete it.

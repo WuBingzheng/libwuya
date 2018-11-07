@@ -15,6 +15,8 @@ struct wuy_heap_s {
 	size_t			capture;
 	size_t			count;
 
+	wuy_heap_update_f	*key_update;
+
 	size_t			node_offset;
 };
 
@@ -219,6 +221,20 @@ bool wuy_heap_push_or_fix(wuy_heap_t *heap, void *item)
 		return true;
 	} else {
 		return wuy_heap_push_node(heap, node);
+	}
+}
+
+void wuy_heap_set_rebuild_update(wuy_heap_t *heap, wuy_heap_update_f *f)
+{
+	heap->key_update = f;
+}
+void wuy_heap_rebuild(wuy_heap_t *heap)
+{
+	for (size_t i = 0; i < heap->count; i++) {
+		if (heap->key_update != NULL) {
+			heap->key_update(_index_to_item(heap, i));
+		}
+		wuy_heapify_up(heap, i);
 	}
 }
 
