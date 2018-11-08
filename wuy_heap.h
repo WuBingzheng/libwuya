@@ -141,4 +141,13 @@ bool wuy_heap_delete(wuy_heap_t *heap, void *item);
  */
 size_t wuy_heap_count(wuy_heap_t *heap);
 
+/* for wuy_heap_iter only */
+void * _wuy_heap_item(wuy_heap_t *heap, size_t i);
+
+/**
+ * @brief Iterate over a heap, readonly and NOT in order.
+ */
+#define wuy_heap_iter(heap, item) \
+	for (size_t _hi = 0; (item = _wuy_heap_item(heap, _hi)) != NULL; _hi++)
+
 #endif

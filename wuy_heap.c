@@ -69,6 +69,14 @@ static void *_index_to_key(wuy_heap_t *heap, size_t i)
 	return (char *)(heap->array[i]) - heap->node_offset + heap->key_offset;
 }
 
+void * _wuy_heap_item(wuy_heap_t *heap, size_t i)
+{
+	if (i >= heap->count) {
+		return NULL;
+	}
+	return _index_to_item(heap, i);
+}
+
 static bool wuy_heap_less(wuy_heap_t *heap, size_t i, size_t j)
 {
 	if (heap->key_less != NULL) {
