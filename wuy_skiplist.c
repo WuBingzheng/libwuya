@@ -141,13 +141,14 @@ static bool wuy_skiplist_next_less(wuy_skiplist_t *skiplist,
 static void wuy_skiplist_get_previous(wuy_skiplist_t *skiplist,
 		wuy_skiplist_node_t **previous, const void *key)
 {
+	int i = 0;
 	if (skiplist->level == 0) {
 		previous[0] = NULL;
 		return;
 	}
 
 	wuy_skiplist_node_t *node = &skiplist->header;
-	for (int i = skiplist->level - 1; i > 0; i--) {
+	for (i = skiplist->level - 1; i > 0; i--) {
 		while (node->nexts[i] != NULL && wuy_skiplist_next_less(skiplist,
 					node->nexts[i], key)) {
 			node = node->nexts[i];
@@ -163,10 +164,11 @@ static void wuy_skiplist_get_previous(wuy_skiplist_t *skiplist,
 
 static int wuy_skiplist_random_level(int max)
 {
+	int i = 0;
 	int level = 1;
 	while (1) {
 		long r = random();
-		for (int i = 0; i < 15; i++) {
+		for (i = 0; i < 15; i++) {
 			if ((r & 0x3) != 0) {
 				return level;
 			}
@@ -186,6 +188,7 @@ static wuy_skiplist_node_t *wuy_skiplist_node_new(wuy_skiplist_t *skiplist, int 
 
 bool wuy_skiplist_insert(wuy_skiplist_t *skiplist, void *item)
 {
+	int i = 0;
 	wuy_skiplist_node_t *previous[skiplist->skpool->max];
 	wuy_skiplist_get_previous(skiplist, previous, item);
 
@@ -205,7 +208,7 @@ bool wuy_skiplist_insert(wuy_skiplist_t *skiplist, void *item)
 		if (new_node == NULL) {
 			return false;
 		}
-		for (int i = level - 1; i > 0; i--) {
+		for (i = level - 1; i > 0; i--) {
 			new_node->nexts[i] = previous[i]->nexts[i];
 			previous[i]->nexts[i] = new_node;
 		}
