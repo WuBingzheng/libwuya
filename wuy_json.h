@@ -9,10 +9,11 @@ typedef struct {
 	char	*start;
 	char	*end;
 	char	*pos;
+	void	*app_data;
 } wuy_json_ctx_t;
 
 #define WUY_JSON_CTX_INIT(buf, size) \
-	{ .start = buf, .pos = buf, .end = buf + size, }
+	{ .start = buf, .pos = buf, .end = buf + size, .app_data = NULL }
 
 #define WUY_JSON_CTX(name, buf, size) \
 	wuy_json_ctx_t name = WUY_JSON_CTX_INIT(buf, size)
