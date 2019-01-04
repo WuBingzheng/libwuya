@@ -22,5 +22,7 @@ int wuy_event_del_read(wuy_event_ctx_t *ctx, int fd, void *data,
 		wuy_event_status_t *status);
 int wuy_event_del_write(wuy_event_ctx_t *ctx, int fd, void *data,
 		wuy_event_status_t *status);
+int wuy_event_del(wuy_event_ctx_t *ctx, int fd,
+		wuy_event_status_t *status);
 
 #endif

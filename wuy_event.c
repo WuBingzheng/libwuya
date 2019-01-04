@@ -127,3 +127,14 @@ int wuy_event_del_write(wuy_event_ctx_t *ctx, int fd, void *data,
 	}
 }
 
+int wuy_event_del(wuy_event_ctx_t *ctx, int fd,
+		wuy_event_status_t *status)
+{
+	if (!status->set_write && !status->set_read) {
+		return 0;
+	}
+	status->set_read = 0;
+	status->set_write = 0;
+	return wuy_event_do_del(ctx->fd, fd);
+}
+
