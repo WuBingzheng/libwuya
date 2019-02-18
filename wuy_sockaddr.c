@@ -48,6 +48,7 @@ static bool wuy_sockaddr_pton_ipv4(const char *str, struct sockaddr_in *out,
 			if (!inet_pton(AF_INET, str, &(out->sin_addr))) {
 				return false;
 			}
+			out->sin_port = htons(default_port);
 		} else { /* port is mandatory */
 			if (!wuy_port_pton(str, &(out->sin_port))) {
 				return false;
