@@ -18,6 +18,7 @@
 #define WUY_LIST_H
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <stddef.h>
 
 #include "wuy_container.h"
