@@ -1,8 +1,14 @@
-/*
- * Utils for TCP socket.
+/**
+ * @file     wuy_sockaddr.h
+ * @author   Wu Bingzheng <wubingzheng@gmail.com>
+ * @date     2018-7-19
  *
- * Author: Wu Bingzheng
+ * @section LICENSE
+ * GPLv2
  *
+ * @section DESCRIPTION
+ *
+ * Some TCP connection utils in non-blocking mode.
  */
 
 #define __USE_GNU
@@ -22,10 +28,16 @@
 #include <errno.h>
 
 
+/**
+ * @brief Set sndbuf.
+ */
 static inline int wuy_tcp_set_sndbuf(int fd, int value)
 {
 	return setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &value, sizeof(int));
 }
+/**
+ * @brief Get sndbuf.
+ */
 static inline int wuy_tcp_get_sndbuf(int fd)
 {
 	int value;
@@ -33,10 +45,16 @@ static inline int wuy_tcp_get_sndbuf(int fd)
 	getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &value, &size);
 	return value;
 }
+/**
+ * @brief Set rcvbuf.
+ */
 static inline int wuy_tcp_set_rcvbuf(int fd, int value)
 {
 	return setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &value, sizeof(int));
 }
+/**
+ * @brief Get rcvbuf.
+ */
 static inline int wuy_tcp_get_rcvbuf(int fd)
 {
 	int value;
@@ -44,15 +62,24 @@ static inline int wuy_tcp_get_rcvbuf(int fd)
 	getsockopt(fd, SOL_SOCKET, SO_RCVBUF, &value, &size);
 	return value;
 }
+/**
+ * @brief Set cork.
+ */
 static inline int wuy_tcp_set_cork(int fd, int cork)
 {
 	return setsockopt(fd, IPPROTO_TCP, TCP_CORK, &cork, sizeof(int));
 }
+/**
+ * @brief Set defer_accept.
+ */
 static inline int wuy_tcp_set_defer_accept(int fd, int value)
 {
 	return setsockopt(fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &value, sizeof(int));
 }
 
+/**
+ * @brief Bind and listen on the address.
+ */
 static inline int wuy_tcp_listen(struct sockaddr *sa, int backlog, bool reuse_port)
 {
 	int fd = socket(sa->sa_family, SOCK_STREAM, 0);  
@@ -81,13 +108,20 @@ static inline int wuy_tcp_listen(struct sockaddr *sa, int backlog, bool reuse_po
 	return fd;
 }
 
-
+/**
+ * @brief Accept new connections.
+ */
 static inline int wuy_tcp_accept(int listen_fd, struct sockaddr *client_addr)
 {
 	socklen_t addrlen = sizeof(struct sockaddr);
 	return accept4(listen_fd, client_addr, &addrlen, SOCK_NONBLOCK);
 }
 
+/**
+ * @brief Connect to the address.
+ *
+ * You should check the errno to know if the connection is ready to write.
+ */
 static inline int wuy_tcp_connect(struct sockaddr *sa)
 {
 	int fd = socket(sa->sa_family, SOCK_STREAM, 0);

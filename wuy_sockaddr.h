@@ -1,8 +1,14 @@
-/*
- * transfer socket address
+/**
+ * @file     wuy_sockaddr.h
+ * @author   Wu Bingzheng <wubingzheng@gmail.com>
+ * @date     2018-7-19
  *
- * Author: Wu Bingzheng
+ * @section LICENSE
+ * GPLv2
  *
+ * @section DESCRIPTION
+ *
+ * Transfer socket address between struct sockaddr and string.
  */
 
 #ifndef WUY_SOCKADDR_H
