@@ -120,6 +120,8 @@ static uint32_t wuy_dict_hash_key(wuy_dict_t *dict, const void *key)
 		return (uint64_t)key;
 	case WUY_DICT_KEY_STRING:
 		return wuy_dict_hash_string(key);
+	case WUY_DICT_KEY_POINTER:
+		return wuy_dict_hash_pointer(key);
 	default:
 		abort();
 	}
@@ -138,6 +140,8 @@ static uint32_t wuy_dict_hash_item(wuy_dict_t *dict, const void *item)
 		return (uint32_t)(*(uint64_t *)item_key);
 	case WUY_DICT_KEY_STRING:
 		return wuy_dict_hash_string(*(const char **)item_key);
+	case WUY_DICT_KEY_POINTER:
+		return wuy_dict_hash_pointer(*(const char **)item_key);
 	default:
 		abort();
 	}
@@ -165,6 +169,8 @@ static bool wuy_dict_equal_key(wuy_dict_t *dict, const void *item, const void *k
 		return *(uint64_t *)item_key == (uint64_t)key;
 	case WUY_DICT_KEY_STRING:
 		return strcmp(*(const char **)item_key, key) == 0;
+	case WUY_DICT_KEY_POINTER:
+		return *(uintptr_t *)item_key == (uintptr_t)key;
 	default:
 		abort();
 	}

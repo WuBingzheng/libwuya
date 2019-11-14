@@ -62,6 +62,7 @@ typedef enum {
 	WUY_DICT_KEY_UINT32,
 	WUY_DICT_KEY_UINT64,
 	WUY_DICT_KEY_STRING,
+	WUY_DICT_KEY_POINTER,
 } wuy_dict_key_type_e;
 
 /**
@@ -183,6 +184,19 @@ static inline uint32_t wuy_dict_hash_string(const char *str)
 	uint32_t seed = 131, hash = 0;
 	while (*str) {
 		hash = hash * seed + (*str++);
+	}
+	return hash;
+}
+
+/**
+ * @brief BKDRHash, a simple length-string hash
+ */
+static inline uint32_t wuy_dict_hash_lenstr(const char *str, int len)
+{
+	uint32_t seed = 131, hash = 0;
+	int i;
+	for (i = 0; i < len; i++) {
+		hash = hash * seed + str[i];
 	}
 	return hash;
 }
