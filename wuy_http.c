@@ -279,7 +279,11 @@ int wuy_http_chunked_process(wuy_http_chunked_t *chunked, const uint8_t *in_buf,
 			chunked->state = WUY_HTTP_CHUNKED_HEADER;
 			break;
 		case WUY_HTTP_CHUNKED_FINISH:
-			goto out;
+			if (in_pos[0] != '\r' && in_pos[0] != '\n') {
+				goto out;
+			}
+			proc_len = 1;
+			break;
 		default:
 			return -8;
 		}
