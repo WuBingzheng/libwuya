@@ -98,6 +98,60 @@ static int wuy_cflua_set_float(lua_State *L, struct wuy_cflua_command *cmd, void
 }
 
 static int wuy_cflua_set_types(lua_State *L, struct wuy_cflua_command *cmd, void *container);
+
+static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *cmd, void *container)
+{
+	int i = 1;
+	while (1) {
+		lua_rawgeti(L, -1, i++);
+		if (lua_isnil(L, -1)) {
+			lua_pop(L, 1);
+			break;
+		}
+		int ret = wuy_cflua_set_types(L, cmd, container);
+		if (ret != 0) {
+			return ret;
+		}
+		lua_pop(L, 1);
+	}
+
+	/* return if raw member exist; otherwise try metatable */
+	if (i > 2) {
+		return 0;
+	}
+
+	i = 1;
+	while (1) {
+		lua_pushinteger(L, i++);
+		lua_gettable(L, -2);
+		if (lua_isnil(L, -1)) {
+			lua_pop(L, 1);
+			break;
+		}
+		int ret = wuy_cflua_set_types(L, cmd, container);
+		if (ret != 0) {
+			return ret;
+		}
+		lua_pop(L, 1);
+	}
+	return 0;
+}
+
+static int wuy_cflua_set_option(lua_State *L, struct wuy_cflua_command *cmd, void *container)
+{
+	lua_getfield(L, -1, cmd->name);
+	if (lua_isnil(L, -1)) {
+		printf("invalid table: %s\n", cmd->name);
+		return WUY_CFLUA_ERR_INVALID_TABLE;
+	}
+	int ret = wuy_cflua_set_types(L, cmd, container);
+	if (ret != 0) {
+		return ret;
+	}
+	lua_pop(L, 1);
+	return 0;
+}
+
 static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
 	struct wuy_cflua_table *table = cmd->u.table;
@@ -135,63 +189,24 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 		table->init(container);
 	}
 
-	/* parse array members */
-	int i = 1;
-	while (1) {
-		lua_rawgeti(L, -1, i++);
-		if (lua_isnil(L, -1)) {
-			lua_pop(L, 1);
-			break;
+	for (cmd = table->commands; cmd->type != WUY_CFLUA_TYPE_END; cmd++) {
+		int ret;
+		if (cmd->name == NULL) {
+			ret = wuy_cflua_set_array_members(L, cmd, container);
+		} else {
+			ret = wuy_cflua_set_option(L, cmd, container);
 		}
-
-		/* member command must be at the 1st place, if any */
-		struct wuy_cflua_command *member = &table->commands[0];
-		if (member->name != NULL) {
-			return WUY_CFLUA_ERR_INVALID_MEMBER;
-		}
-		int ret = wuy_cflua_set_types(L, member, container);
 		if (ret != 0) {
 			return ret;
 		}
-
-		lua_pop(L, 1);
 	}
-
-	/* parse key-value options */
-	struct wuy_cflua_command *opt;
-	for (opt = table->commands; opt->type != WUY_CFLUA_TYPE_END; opt++) {
-		if (opt->name == NULL) { /* array member command */
-			continue;
-		}
-
-		lua_pushstring(L, opt->name);
-		lua_gettable(L, -2);
-		if (lua_isnil(L, -1)) {
-			printf("invalid table: %s\n", opt->name);
-			return WUY_CFLUA_ERR_INVALID_TABLE;
-		}
-		int ret = wuy_cflua_set_types(L, opt, container);
-		if (ret != 0) {
-			return ret;
-		}
-		lua_pop(L, 1);
-	}
-	if (opt->u.next != NULL) {
-		struct wuy_cflua_command *(*next)(struct wuy_cflua_command *) = opt->u.next;
-		while ((opt = next(opt)) != NULL) {
-
-			// TODO merge with above
-			lua_pushstring(L, opt->name);
-			lua_gettable(L, -2);
-			if (lua_isnil(L, -1)) {
-				printf("invalid table: %s\n", opt->name);
-				return WUY_CFLUA_ERR_INVALID_TABLE;
-			}
-			int ret = wuy_cflua_set_types(L, opt, container);
+	if (cmd->u.next != NULL) {
+		struct wuy_cflua_command *(*next)(struct wuy_cflua_command *) = cmd->u.next;
+		while ((cmd = next(cmd)) != NULL) {
+			int ret = wuy_cflua_set_option(L, cmd, container);
 			if (ret != 0) {
 				return ret;
 			}
-			lua_pop(L, 1);
 		}
 	}
 

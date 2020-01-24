@@ -6,9 +6,9 @@
 
 #define WUY_CFLUA_ERR_NO_MEM		-1
 #define WUY_CFLUA_ERR_DEPLICATE_MEMBER	-2
-#define WUY_CFLUA_ERR_POST			-3
+#define WUY_CFLUA_ERR_POST		-3
 #define WUY_CFLUA_ERR_INVALID_MEMBER	-4
-#define WUY_CFLUA_ERR_INVALID_TABLE		-5
+#define WUY_CFLUA_ERR_INVALID_TABLE	-5
 
 /* `type` in `struct wuy_cflua_command` */
 enum wuy_cflua_type {
@@ -43,16 +43,16 @@ struct wuy_cflua_command {
 	 * Set it at the 1st place if array member. */
 	const char		*name;
 
-	enum wuy_cflua_type		type;
+	enum wuy_cflua_type	type;
 
-	enum wuy_cflua_flag		flags;
+	enum wuy_cflua_flag	flags;
 
 	/* offset of target member in container. */
 	int			offset;
 
 	union {
 		/* only for WUY_CFLUA_TYPE_TABLE */
-		struct wuy_cflua_table	*table;
+		struct wuy_cflua_table		*table;
 
 		/* only for WUY_CFLUA_TYPE_END */
 		struct wuy_cflua_command	*(*next)(struct wuy_cflua_command *);
