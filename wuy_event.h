@@ -18,6 +18,8 @@ int wuy_event_add_read(wuy_event_ctx_t *ctx, int fd, void *data,
 		wuy_event_status_t *status);
 int wuy_event_add_write(wuy_event_ctx_t *ctx, int fd, void *data,
 		wuy_event_status_t *status);
+int wuy_event_add_rdwr(wuy_event_ctx_t *ctx, int fd, void *data,
+		wuy_event_status_t *status);
 int wuy_event_del_read(wuy_event_ctx_t *ctx, int fd, void *data,
 		wuy_event_status_t *status);
 int wuy_event_del_write(wuy_event_ctx_t *ctx, int fd, void *data,

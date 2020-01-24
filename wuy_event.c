@@ -50,6 +50,10 @@ static int wuy_event_do_add_write(int epfd, int fd, void *data)
 {
 	return wuy_event_op(epfd, fd, EPOLL_CTL_ADD, EPOLLOUT, data);
 }
+static int wuy_event_do_add_rdwr(int epfd, int fd, void *data)
+{
+	return wuy_event_op(epfd, fd, EPOLL_CTL_ADD, EPOLLIN | EPOLLOUT, data);
+}
 static int wuy_event_do_mod_read(int epfd, int fd, void *data)
 {
 	return wuy_event_op(epfd, fd, EPOLL_CTL_MOD, EPOLLIN, data);
@@ -94,6 +98,24 @@ int wuy_event_add_write(wuy_event_ctx_t *ctx, int fd, void *data,
 		return wuy_event_do_mod_rdwr(ctx->fd, fd, data);
 	} else {
 		return wuy_event_do_add_write(ctx->fd, fd, data);
+	}
+}
+
+int wuy_event_add_rdwr(wuy_event_ctx_t *ctx, int fd, void *data,
+		wuy_event_status_t *status)
+{
+	if (status->set_read && status->set_write) {
+		return 0;
+	}
+
+	int any = (status->set_write || status->set_read);
+	status->set_read = 1;
+	status->set_write = 1;
+
+	if (any) {
+		return wuy_event_do_mod_rdwr(ctx->fd, fd, data);
+	} else {
+		return wuy_event_do_add_rdwr(ctx->fd, fd, data);
 	}
 }
 

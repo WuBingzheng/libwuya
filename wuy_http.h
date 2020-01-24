@@ -4,13 +4,48 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define WUY_HTTP_METHOD_GET	1
-#define WUY_HTTP_METHOD_PUT	2
-#define WUY_HTTP_METHOD_POST	3
-#define WUY_HTTP_METHOD_HEAD	4
-#define WUY_HTTP_METHOD_DELETE	5
-#define WUY_HTTP_METHOD_OPTIONS	6
-#define WUY_HTTP_METHOD_CONNECT	7
+#define WUY_HTTP_METHOD_TABLE \
+	X(GET) \
+	X(PUT) \
+	X(POST) \
+	X(HEAD) \
+	X(DELETE) \
+	X(OPTIONS) \
+	X(CONNECT)
+
+enum wuy_http_method {
+	WUY_HTTP_NOUSE_ZERO = 0,
+#define X(m) WUY_HTTP_##m,
+	WUY_HTTP_METHOD_TABLE
+#undef X
+};
+
+#define WUY_HTTP_STATUS_CODE_TABLE \
+	X(200, "OK") \
+	X(201, "Created") \
+	X(202, "Accepted") \
+	X(204, "No Content") \
+	X(301, "Moved Permanently") \
+	X(302, "Found") \
+	X(303, "See Other") \
+	X(307, "Temporary Redirect") \
+	X(400, "Bad Request") \
+	X(401, "Unauthorized") \
+	X(403, "Forbidden") \
+	X(404, "Not Found") \
+	X(405, "Method Not Allowed") \
+	X(406, "Not Acceptable") \
+	X(408, "Request Timeout") \
+	X(500, "Internal Server Error") \
+	X(502, "Bad Gateway") \
+	X(503, "Service Unavailable") \
+	X(504, "Gateway Timeout")
+
+enum wuy_http_status_code {
+#define X(n, s) WUY_HTTP_##n = n,
+	WUY_HTTP_STATUS_CODE_TABLE
+#undef X
+};
 
 /*
  * @brief Parse and return HTTP method.
@@ -19,7 +54,17 @@
  *
  * @return HTTP method if success, or -1 if fail.
  */
-int wuy_http_method(const char *buf, int len);
+enum wuy_http_method wuy_http_method(const char *buf, int len);
+
+/*
+ * @brief Convert method to string.
+ */
+const char *wuy_http_string_method(enum wuy_http_method method);
+
+/*
+ * @brief Convert status code to string.
+ */
+const char *wuy_http_string_status_code(enum wuy_http_status_code code);
 
 /*
  * @brief Parse and return HTTP version.
@@ -37,7 +82,7 @@ int wuy_http_version(const char *buf, int len);
  *
  * @return >0 for the actually line length, or -1 if fail, or 0 if expect more data.
  */
-int wuy_http_request_line(const char *buf, int len, int *out_method,
+int wuy_http_request_line(const char *buf, int len, enum wuy_http_method *out_method,
 		const char **out_url_pos, int *out_url_len, int *out_version);
 
 /*
@@ -47,7 +92,7 @@ int wuy_http_request_line(const char *buf, int len, int *out_method,
  *
  * @return >0 for the actually line length, or -1 if fail, or 0 if expect more data.
  */
-int wuy_http_status_line(const char *buf, int len, int *out_status_code,
+int wuy_http_status_line(const char *buf, int len, enum wuy_http_status_code *out_status_code,
 		int *out_version);
 
 /*

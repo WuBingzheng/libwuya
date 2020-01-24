@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 
 #include "wuy_http.h"
@@ -5,40 +6,32 @@
 #define WUY_HTTP_ERROR -1
 #define WUY_HTTP_AGAIN 0
 
-int wuy_http_method(const char *buf, int len)
+enum wuy_http_method wuy_http_method(const char *buf, int len)
 {
-	switch (len) {
-	case 3:
-		if (memcmp(buf, "GET", 3) == 0) {
-			return WUY_HTTP_METHOD_GET;
-		}
-		if (memcmp(buf, "PUT", 3) == 0) {
-			return WUY_HTTP_METHOD_PUT;
-		}
-		return WUY_HTTP_ERROR;
-	case 4:
-		if (memcmp(buf, "POST", 4) == 0) {
-			return WUY_HTTP_METHOD_POST;
-		}
-		if (memcmp(buf, "HEAD", 4) == 0) {
-			return WUY_HTTP_METHOD_HEAD;
-		}
-		return WUY_HTTP_ERROR;
-	case 6:
-		if (memcmp(buf, "DELETE", 6) == 0) {
-			return WUY_HTTP_METHOD_DELETE;
-		}
-		return WUY_HTTP_ERROR;
-	case 7:
-		if (memcmp(buf, "OPTIONS", 7) == 0) {
-			return WUY_HTTP_METHOD_OPTIONS;
-		}
-		if (memcmp(buf, "CONNECT", 7) == 0) {
-			return WUY_HTTP_METHOD_CONNECT;
-		}
-		return WUY_HTTP_ERROR;
+#define X(m) if (len == sizeof(#m)-1 && memcmp(buf, #m, sizeof(#m)-1) == 0) return WUY_HTTP_##m;
+	WUY_HTTP_METHOD_TABLE
+#undef X
+	return WUY_HTTP_ERROR;
+}
+
+const char *wuy_http_string_method(enum wuy_http_method method)
+{
+	switch (method) {
+#define X(m) case WUY_HTTP_##m: return #m;
+	WUY_HTTP_METHOD_TABLE
+#undef X
+	default: return NULL;
+	}
+}
+
+const char *wuy_http_string_status_code(enum wuy_http_status_code code)
+{
+	switch (code) {
+#define X(n, s) case n: return s;
+	WUY_HTTP_STATUS_CODE_TABLE
+#undef X
 	default:
-		return WUY_HTTP_ERROR;
+		return "XXX";
 	}
 }
 
@@ -60,7 +53,7 @@ int wuy_http_version(const char *buf, int len)
 	}
 }
 
-int wuy_http_request_line(const char *buf, int len, int *out_method,
+int wuy_http_request_line(const char *buf, int len, enum wuy_http_method *out_method,
 		const char **out_url_pos, int *out_url_len, int *out_version)
 {
 	const char *end = buf + len;
@@ -103,7 +96,7 @@ int wuy_http_request_line(const char *buf, int len, int *out_method,
 	return version + sizeof("HTTP/1.1\r\n") - 1 - buf;
 }
 
-int wuy_http_status_line(const char *buf, int len, int *out_status_code,
+int wuy_http_status_line(const char *buf, int len, enum wuy_http_status_code *out_status_code,
 		int *out_version)
 {
 	if (len < sizeof("HTTP/1.1 200\r\n") - 1) {
