@@ -202,6 +202,7 @@ static void wuy_dict_expasion(wuy_dict_t *dict)
 			uint32_t index = wuy_dict_index_item(dict, item);
 			wuy_hlist_insert(&dict->buckets[index], node);
 		}
+		wuy_hlist_head_init(&dict->prev_buckets[dict->split]);
 
 		dict->split++;
 		if (dict->split == dict->bucket_size / 2) {
