@@ -143,6 +143,14 @@ static inline wuy_list_node_t *wuy_list_first(const wuy_list_t *list)
 }
 
 /**
+ * @brief Return last node, or NULL if empty.
+ */
+static inline wuy_list_node_t *wuy_list_last(const wuy_list_t *list)
+{
+        return wuy_list_empty(list) ? NULL : list->head.prev;
+}
+
+/**
  * @brief Iterate over a list, while it's NOT safe to delete node.
  */
 #define wuy_list_iter(list, node) \
