@@ -28,6 +28,7 @@ enum wuy_http_method {
 	X(301, "Moved Permanently") \
 	X(302, "Found") \
 	X(303, "See Other") \
+	X(304, "Not Modified") \
 	X(307, "Temporary Redirect") \
 	X(400, "Bad Request") \
 	X(401, "Unauthorized") \
@@ -119,5 +120,9 @@ void wuy_http_chunked_init(wuy_http_chunked_t *chunked);
 void wuy_http_chunked_enable(wuy_http_chunked_t *chunked);
 bool wuy_http_chunked_is_enabled(const wuy_http_chunked_t *chunked);
 bool wuy_http_chunked_is_finished(const wuy_http_chunked_t *chunked);
+
+#define WUY_HTTP_DATE_LENGTH (sizeof("Tue, 12 Jan 2010 13:48:00 GMT") - 1)
+time_t wuy_http_date_parse(const char *str);
+const char *wuy_http_date_make(time_t ts);
 
 #endif

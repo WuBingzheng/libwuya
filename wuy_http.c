@@ -1,4 +1,7 @@
+#define _XOPEN_SOURCE
+#define _BSD_SOURCE
 #include <stdio.h>
+#include <time.h>
 #include <string.h>
 
 #include "wuy_http.h"
@@ -306,4 +309,24 @@ bool wuy_http_chunked_is_enabled(const wuy_http_chunked_t *chunked)
 bool wuy_http_chunked_is_finished(const wuy_http_chunked_t *chunked)
 {
 	return chunked->state == WUY_HTTP_CHUNKED_FINISH;
+}
+
+#define WUY_HTTP_DATE_FORMAT "%a, %d %b %Y %H:%M:%S GMT"
+time_t wuy_http_date_parse(const char *str)
+{
+        struct tm tm;
+        char *end = strptime(str, WUY_HTTP_DATE_FORMAT, &tm);
+        if (*end != '\0') {
+                return -1;
+        }
+        return timegm(&tm);
+}
+const char *wuy_http_date_make(time_t ts)
+{
+        static time_t last = 0;
+        static char cache[WUY_HTTP_DATE_LENGTH + 1];
+        if (ts != last) {
+                strftime(cache, sizeof(cache), WUY_HTTP_DATE_FORMAT, gmtime(&ts));
+        }
+        return cache;
 }
