@@ -42,6 +42,11 @@ wuy_skiplist_pool_t *wuy_skiplist_pool_new(int max)
 	return skpool;
 }
 
+void wuy_skiplist_destroy(wuy_skiplist_t *skiplist)
+{
+	free(skiplist);
+}
+
 static wuy_skiplist_t *wuy_skiplist_new(size_t node_offset, wuy_skiplist_pool_t *skpool)
 {
 	size_t size = sizeof(wuy_skiplist_t) + sizeof(wuy_skiplist_node_t *) * skpool->max;

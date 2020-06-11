@@ -102,6 +102,13 @@ wuy_skiplist_t *wuy_skiplist_new_type(wuy_skiplist_key_type_e key_type,
 		size_t node_offset, wuy_skiplist_pool_t *skpool);
 
 /**
+ * @brief Destroy a skiplist.
+ *
+ * It just frees the skiplist, but do not releases the nodes.
+ */
+void wuy_skiplist_destroy(wuy_skiplist_t *skiplist);
+
+/**
  * @brief Insert an item to skiplist.
  *
  * @return true if success, or false if memory allocation fails.
