@@ -3,13 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "wuy_pool.h"
 #include "wuy_skiplist.h"
-
-struct wuy_skiplist_pool_s {
-	int		max;
-	wuy_pool_t	*pools[0];
-}; 
 
 struct wuy_skiplist_s {
 	wuy_skiplist_key_type_e	key_type;
@@ -20,44 +14,29 @@ struct wuy_skiplist_s {
 	size_t			node_offset;
 
 	int			level;
+	int			max_level;
 
 	long			count;
-
-	wuy_skiplist_pool_t	*skpool;
 
 	wuy_skiplist_node_t	header;
 };
 
-wuy_skiplist_pool_t *wuy_skiplist_pool_new(int max)
+static wuy_skiplist_t *wuy_skiplist_new(size_t node_offset, int max_level)
 {
-	wuy_skiplist_pool_t *skpool = malloc(sizeof(wuy_skiplist_pool_t)
-			+ sizeof(wuy_pool_t *) * max);
-	assert(skpool != NULL);
-
-	skpool->max = max;
-	for (int i = 0; i < max - 1; i++) {
-		skpool->pools[i] = wuy_pool_new(sizeof(wuy_skiplist_node_t *) * (i+2));
-		assert(skpool->pools[i] != NULL);
-	}
-	return skpool;
-}
-
-static wuy_skiplist_t *wuy_skiplist_new(size_t node_offset, wuy_skiplist_pool_t *skpool)
-{
-	size_t size = sizeof(wuy_skiplist_t) + sizeof(wuy_skiplist_node_t *) * skpool->max;
+	size_t size = sizeof(wuy_skiplist_t) + sizeof(wuy_skiplist_node_t *) * max_level;
 	wuy_skiplist_t *skiplist = malloc(size);
 	assert(skiplist != NULL);
 
 	bzero(skiplist, size);
-	skiplist->skpool = skpool;
 	skiplist->node_offset = node_offset;
+	skiplist->max_level = max_level;
 	return skiplist;
 }
 
 wuy_skiplist_t *wuy_skiplist_new_func(wuy_skiplist_less_f *key_less,
-		size_t node_offset, wuy_skiplist_pool_t *skpool)
+		size_t node_offset, int max_level)
 {
-	wuy_skiplist_t *skiplist = wuy_skiplist_new(node_offset, skpool);
+	wuy_skiplist_t *skiplist = wuy_skiplist_new(node_offset, max_level);
 	skiplist->key_less = key_less;
 	skiplist->key_type = 100;
 	skiplist->key_offset = 0;
@@ -66,9 +45,9 @@ wuy_skiplist_t *wuy_skiplist_new_func(wuy_skiplist_less_f *key_less,
 
 wuy_skiplist_t *wuy_skiplist_new_type(wuy_skiplist_key_type_e key_type,
 		size_t key_offset, bool key_reverse,
-		size_t node_offset, wuy_skiplist_pool_t *skpool)
+		size_t node_offset, int max_level)
 {
-	wuy_skiplist_t *skiplist = wuy_skiplist_new(node_offset, skpool);
+	wuy_skiplist_t *skiplist = wuy_skiplist_new(node_offset, max_level);
 	skiplist->key_less = NULL;
 	skiplist->key_type = key_type;
 	skiplist->key_offset = key_offset;
@@ -179,17 +158,12 @@ static int wuy_skiplist_random_level(int max)
 	}
 }
 
-static wuy_skiplist_node_t *wuy_skiplist_node_new(wuy_skiplist_t *skiplist, int level)
-{
-	return wuy_pool_alloc(skiplist->skpool->pools[level - 2]);
-}
-
 bool wuy_skiplist_insert(wuy_skiplist_t *skiplist, void *item)
 {
-	wuy_skiplist_node_t *previous[skiplist->skpool->max];
+	wuy_skiplist_node_t *previous[skiplist->max_level];
 	wuy_skiplist_get_previous(skiplist, previous, item);
 
-	int level = wuy_skiplist_random_level(skiplist->skpool->max);
+	int level = wuy_skiplist_random_level(skiplist->max_level);
 
 	/* increase skiplist->level if need */
 	while (skiplist->level < level) {
@@ -201,7 +175,7 @@ bool wuy_skiplist_insert(wuy_skiplist_t *skiplist, void *item)
 	previous[0]->nexts[0] = item_node;
 
 	if (level > 1) {
-		wuy_skiplist_node_t *new_node = wuy_skiplist_node_new(skiplist, level);
+		wuy_skiplist_node_t *new_node = malloc(sizeof(wuy_skiplist_node_t *) * level);
 		if (new_node == NULL) {
 			return false;
 		}
@@ -233,7 +207,7 @@ static void wuy_skiplist_delete_node(wuy_skiplist_t *skiplist,
 	}
 
 	if (ex_node != node) {
-		wuy_pool_free(ex_node);
+		free(ex_node);
 	}
 
 	/* decrease skiplist->level if need */
@@ -250,7 +224,7 @@ bool wuy_skiplist_delete(wuy_skiplist_t *skiplist, void *item)
 		return false;
 	}
 
-	wuy_skiplist_node_t *previous[skiplist->skpool->max];
+	wuy_skiplist_node_t *previous[skiplist->max_level];
 	wuy_skiplist_get_previous(skiplist, previous, item);
 
 	wuy_skiplist_node_t *node = _item_to_node(skiplist, item);
@@ -286,13 +260,13 @@ static void *wuy_skiplist_search_key(wuy_skiplist_t *skiplist,
 
 void *_wuy_skiplist_search(wuy_skiplist_t *skiplist, const void *key)
 {
-	wuy_skiplist_node_t *previous[skiplist->skpool->max];
+	wuy_skiplist_node_t *previous[skiplist->max_level];
 	return wuy_skiplist_search_key(skiplist, previous, key);
 }
 
 void *_wuy_skiplist_del_key(wuy_skiplist_t *skiplist, const void *key)
 {
-	wuy_skiplist_node_t *previous[skiplist->skpool->max];
+	wuy_skiplist_node_t *previous[skiplist->max_level];
 	void *item = wuy_skiplist_search_key(skiplist, previous, key);
 	if (item == NULL) {
 		return NULL;

@@ -36,15 +36,11 @@ int main()
 			offsetof(struct student_score, id),
 			offsetof(struct student_score, dict_node));
 
-	/* create a skiplist-pool with skiplist level max, which should be
-	 * by multiple skiplist in one thread. */
-	wuy_skiplist_pool_t *skpool = wuy_skiplist_pool_new(10);
-
 	/* create a skiplist, since we want to sort students with same
 	 * score by ID, so we do not use WUY_SKIPLIST_KEY_FLOAT, while
 	 * we define compare function ss_less. */
 	wuy_skiplist_t *skiplist = wuy_skiplist_new_func(ss_less,
-			offsetof(struct student_score, skiplist_node), skpool);
+			offsetof(struct student_score, skiplist_node), 8);
 
 	struct student_score nodes[10];
 
@@ -111,6 +107,8 @@ int main()
 	wuy_skiplist_iter(skiplist, ss) {
 		printf("  id=%d score=%.1f\n", ss->id, ss->score);
 	}
+
+	printf("done.\n");
 
 	return 0;
 }

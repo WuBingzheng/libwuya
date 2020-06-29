@@ -19,13 +19,6 @@
 #include "wuy_container.h"
 
 /**
- * @brief Memory pool for skiplist node.
- *
- * A pool should be shared amount all skiplists in a thread, but not cross thread.
- */
-typedef struct wuy_skiplist_pool_s wuy_skiplist_pool_t;
-
-/**
  * @brief The skiplist.
  */
 typedef struct wuy_skiplist_s wuy_skiplist_t;
@@ -70,21 +63,16 @@ typedef enum {
 } wuy_skiplist_key_type_e;
 
 /**
- * @brief Create a new memory pool for skiplist.
- */
-wuy_skiplist_pool_t *wuy_skiplist_pool_new(int max);
-
-/**
  * @brief Create a new skiplist, with the user-defined comparison function.
  *
  * @param key_less use-defined compare function.
  * @param node_offset the offset of wuy_skiplist_node_t in your data struct.
- * @param skpool the memory pool.
+ * @param max_level max level.
  *
  * @return the new skiplist. It aborts the program if memory allocation fails.
  */
 wuy_skiplist_t *wuy_skiplist_new_func(wuy_skiplist_less_f *key_less,
-		size_t node_offset, wuy_skiplist_pool_t *skpool);
+		size_t node_offset, int max_level);
 
 /**
  * @brief Create a new skiplist, with general comparison key type.
@@ -93,13 +81,13 @@ wuy_skiplist_t *wuy_skiplist_new_func(wuy_skiplist_less_f *key_less,
  * @param key_offset the offset of key in your data struct.
  * @param key_reverse if reverse the comparison.
  * @param node_offset the offset of wuy_skiplist_node_t in your data struct.
- * @param skpool the memory pool.
+ * @param max_level max level.
  *
  * @return the new skiplist. It aborts the program if memory allocation fails.
  */
 wuy_skiplist_t *wuy_skiplist_new_type(wuy_skiplist_key_type_e key_type,
 		size_t key_offset, bool key_reverse,
-		size_t node_offset, wuy_skiplist_pool_t *skpool);
+		size_t node_offset, int max_level);
 
 /**
  * @brief Insert an item to skiplist.
