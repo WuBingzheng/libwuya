@@ -30,7 +30,8 @@ typedef struct wuy_heap_s wuy_heap_t;
  * Pass its offset in your data struct to wuy_heap_new_xxx(), and
  * you need not use it later.
  *
- * You need not initialize it before using it.
+ * This is not need to be initialized before used in fact. However it
+ * will lead warnings for some memory check tools such as Valgrind.
  */
 typedef struct {
 	size_t index;
