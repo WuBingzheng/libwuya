@@ -144,6 +144,16 @@ static inline void wuy_list_del_init(wuy_list_node_t *node)
 }
 
 /**
+ * @brief Delete node if linked.
+ */
+static inline void wuy_list_del_if(wuy_list_node_t *node)
+{
+	if (node->prev != NULL) {
+		_list_del(node->prev, node->next);
+	}
+}
+
+/**
  * @brief Return if the list head is empty.
  */
 static inline bool wuy_list_empty(const wuy_list_t *list)
@@ -161,6 +171,22 @@ static inline wuy_list_node_t *wuy_list_first(const wuy_list_t *list)
 }
 
 /**
+ * @brief Remove and return first node, or NULL if empty.
+ */
+static inline wuy_list_node_t *wuy_list_pop(const wuy_list_t *list)
+{
+	if (wuy_list_empty(list)) {
+		return NULL;
+	}
+	wuy_list_node_t *node = list->head.next;
+	wuy_list_delete(node);
+	return node;
+}
+
+#define wuy_list_pop_type(list, p, member) \
+	(p = wuy_containerof_check(wuy_list_pop(list), typeof(*p), member))
+
+/**
  * @brief Return last node, or NULL if empty.
  */
 static inline wuy_list_node_t *wuy_list_last(const wuy_list_t *list)
@@ -169,7 +195,10 @@ static inline wuy_list_node_t *wuy_list_last(const wuy_list_t *list)
 }
 
 /**
- * @brief Iterate over a list, while it's NOT safe to delete node.
+ * @brief Iterate over a list.
+ *
+ * If you may delete node during iteration and continue the iteration,
+ * use @wuy_list_iter_safe instead.
  */
 #define wuy_list_iter(list, node) \
 	for (node = (list)->head.next; node != &((list)->head); \
@@ -184,7 +213,10 @@ static inline wuy_list_node_t *wuy_list_last(const wuy_list_t *list)
 			node = safe, safe = node->next)
 
 /**
- * @brief Iterate over a list reverse, while it's NOT safe to delete node.
+ * @brief Iterate over a list reverse.
+ *
+ * If you may delete node during iteration and continue the iteration,
+ * use @wuy_list_iter_safe instead.
  */
 #define wuy_list_iter_reverse(list, node) \
 	for (node = (list)->head.prev; node != &((list)->head); \
@@ -199,9 +231,55 @@ static inline wuy_list_node_t *wuy_list_last(const wuy_list_t *list)
 			node = safe, safe = node->prev)
 
 /**
- * @brief Iterate over a list, always getting the first.
+ * @brief Iterate over a list.
+ *
+ * @param p  a pointer of user's struct type;
+ * @param member  name of wuy_list_node_t member in user's struct.
  */
-#define wuy_list_iter_first(list, node) \
-	while ((node = (list)->head.next) != &((list)->head))
+#define wuy_list_iter_type(list, p, member) \
+	for (p = wuy_containerof((list)->head.next, typeof(*p), member);\
+			&p->member != &(list)->head; \
+			p = wuy_containerof(p->member.next, typeof(*p), member))
+
+/* used internal */
+#define wuy_list_next_type(p, member) \
+	wuy_containerof(p->member.next, typeof(*p), member)
+#define wuy_list_prev_type(p, member) \
+	wuy_containerof(p->member.prev, typeof(*p), member)
+
+/**
+ * @brief Iterate over a list, while it's safe to delete node.
+ *
+ * @param p  a pointer of user's struct type;
+ * @param member  name of wuy_list_node_t member in user's struct.
+ */
+#define wuy_list_iter_safe_type(list, p, safe, member) \
+	for (p = wuy_containerof((list)->head.next, typeof(*p), member), \
+				safe = wuy_list_next_type(p, member); \
+			&p->member != &(list)->head; \
+			p = safe, safe = wuy_list_next_type(p, member))
+
+/**
+ * @brief Iterate over a list reverse.
+ *
+ * @param p  a pointer of user's struct type;
+ * @param member  name of wuy_list_node_t member in user's struct.
+ */
+#define wuy_list_iter_reverse_type(list, p, member) \
+	for (p = wuy_containerof((list)->head.prev, typeof(*p), member);\
+			&p->member != &(list)->head; \
+			p = wuy_containerof(p->member.prev, typeof(*p), member))
+
+/**
+ * @brief Iterate over a list reverse, while it's safe to delete node.
+ *
+ * @param p  a pointer of user's struct type;
+ * @param member  name of wuy_list_node_t member in user's struct.
+ */
+#define wuy_list_iter_reverse_safe_type(list, p, safe, member) \
+	for (p = wuy_containerof((list)->head.prev, typeof(*p), member), \
+				safe = wuy_list_prev_type(p, member); \
+			&p->member != &(list)->head; \
+			p = safe, safe = wuy_list_prev_type(p, member))
 
 #endif

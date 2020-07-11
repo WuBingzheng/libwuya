@@ -106,4 +106,21 @@ static inline void wuy_hlist_delete(wuy_hlist_node_t *node)
 	for (pos = (head)->first, n = pos?pos->next:NULL; pos; \
 		pos = n, n = pos?pos->next:NULL)
 
+/**
+ * @brief Iterate over a list. It's safe to delete node during it.
+ *
+ * @param p  a pointer of user's struct type;
+ * @param member  name of wuy_hlist_node_t member in user's struct.
+ *
+ * Compared to @wuy_hlist_iter_safe, this macro transfer hlist node
+ * to user's struct type pointer. This it more convenient.
+ * Use @wuy_hlist_iter and @wuy_hlist_iter_safe only when you do not
+ * know the container's type, e.g. in wuy_dict.c .
+ */
+#define wuy_hlist_iter_type(head, p, member) \
+	for (wuy_hlist_node_t *_next, *_iter = (head)->first; \
+		_iter != NULL && (_next = _iter->next, \
+			p = wuy_containerof(_iter, typeof(*p), member)); \
+		_iter = _next)
+
 #endif
