@@ -170,6 +170,9 @@ static inline wuy_list_node_t *wuy_list_first(const wuy_list_t *list)
 	return wuy_list_empty(list) ? NULL : list->head.next;
 }
 
+#define wuy_list_first_type(list, p, member) \
+	(p = wuy_containerof_check(wuy_list_first(list), typeof(*p), member))
+
 /**
  * @brief Remove and return first node, or NULL if empty.
  */
