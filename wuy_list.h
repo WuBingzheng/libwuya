@@ -163,6 +163,14 @@ static inline bool wuy_list_empty(const wuy_list_t *list)
 }
 
 /**
+ * @brief Return if the list node is linked.
+ */
+static inline bool wuy_list_node_linked(const wuy_list_node_t *node)
+{
+	return node->next != NULL;
+}
+
+/**
  * @brief Return first node, or NULL if empty.
  */
 static inline wuy_list_node_t *wuy_list_first(const wuy_list_t *list)
