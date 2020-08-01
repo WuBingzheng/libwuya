@@ -184,7 +184,7 @@ static inline wuy_list_node_t *wuy_list_first(const wuy_list_t *list)
 /**
  * @brief Remove and return first node, or NULL if empty.
  */
-static inline wuy_list_node_t *wuy_list_pop(const wuy_list_t *list)
+static inline wuy_list_node_t *wuy_list_pop(wuy_list_t *list)
 {
 	if (wuy_list_empty(list)) {
 		return NULL;
@@ -241,6 +241,12 @@ static inline wuy_list_node_t *wuy_list_last(const wuy_list_t *list)
 			node != &((list)->head); \
 			node = safe, safe = node->prev)
 
+/* used internal */
+#define wuy_list_next_type(p, member) \
+	wuy_containerof(p->member.next, typeof(*p), member)
+#define wuy_list_prev_type(p, member) \
+	wuy_containerof(p->member.prev, typeof(*p), member)
+
 /**
  * @brief Iterate over a list.
  *
@@ -250,13 +256,7 @@ static inline wuy_list_node_t *wuy_list_last(const wuy_list_t *list)
 #define wuy_list_iter_type(list, p, member) \
 	for (p = wuy_containerof((list)->head.next, typeof(*p), member);\
 			&p->member != &(list)->head; \
-			p = wuy_containerof(p->member.next, typeof(*p), member))
-
-/* used internal */
-#define wuy_list_next_type(p, member) \
-	wuy_containerof(p->member.next, typeof(*p), member)
-#define wuy_list_prev_type(p, member) \
-	wuy_containerof(p->member.prev, typeof(*p), member)
+			p = wuy_list_next_type(p, member))
 
 /**
  * @brief Iterate over a list, while it's safe to delete node.
@@ -279,7 +279,7 @@ static inline wuy_list_node_t *wuy_list_last(const wuy_list_t *list)
 #define wuy_list_iter_reverse_type(list, p, member) \
 	for (p = wuy_containerof((list)->head.prev, typeof(*p), member);\
 			&p->member != &(list)->head; \
-			p = wuy_containerof(p->member.prev, typeof(*p), member))
+			p = wuy_list_prev_type(p, member))
 
 /**
  * @brief Iterate over a list reverse, while it's safe to delete node.
