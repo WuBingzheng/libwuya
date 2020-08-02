@@ -9,13 +9,14 @@
 #define WUY_CFLUA_ERR_POST		-3
 #define WUY_CFLUA_ERR_INVALID_MEMBER	-4
 #define WUY_CFLUA_ERR_INVALID_TABLE	-5
+#define WUY_CFLUA_ERR_TOO_DEEP_META	-6
 
 /* `type` in `struct wuy_cflua_command` */
 enum wuy_cflua_type {
 	WUY_CFLUA_TYPE_END = 0,
 	WUY_CFLUA_TYPE_BOOLEAN,
 	WUY_CFLUA_TYPE_INTEGER,
-	WUY_CFLUA_TYPE_FLOAT,
+	WUY_CFLUA_TYPE_DOUBLE,
 	WUY_CFLUA_TYPE_STRING,
 	WUY_CFLUA_TYPE_FUNCTION,
 	WUY_CFLUA_TYPE_TABLE,
@@ -29,11 +30,11 @@ enum wuy_cflua_flag {
 	/* only for WUY_CFLUA_TYPE_TABLE, reuse table with the same address */
 	WUY_CFLUA_FLAG_TABLE_REUSE = 0x1,
 
-	/* only for array member commands, accept 1 member only */
-	WUY_CFLUA_FLAG_UNIQ_MEMBER = 0x2,
-
 	/* only for WUY_CFLUA_TYPE_TABLE, allow arbitrary key */
-	WUY_CFLUA_FLAG_ARBITRARY_KEY = 0x3,
+	WUY_CFLUA_FLAG_ARBITRARY_KEY = 0x2,
+
+	/* only for array member commands, accept 1 member only */
+	WUY_CFLUA_FLAG_UNIQ_MEMBER = 0x4,
 };
 
 struct wuy_cflua_table;
@@ -49,6 +50,9 @@ struct wuy_cflua_command {
 
 	/* offset of target member in container. */
 	int			offset;
+
+	/* offset of number of array members. only for array member command. */
+	int			array_num_offset;
 
 	union {
 		/* only for WUY_CFLUA_TYPE_TABLE */

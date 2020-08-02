@@ -4,7 +4,6 @@
 #include <lua5.1/lauxlib.h>
 
 #include "wuy_dict.h"
-#include "wuy_array.h"
 
 #include "wuy_cflua.h"
 
@@ -39,23 +38,8 @@ static wuy_array_t wuy_cflua_tables;
 #endif
 
 
-#define wuy_cflua_assign_value(cmd, container, value, type) \
-	do { \
-		void *target = ((char *)container) + cmd->offset; \
-		if (cmd->name != NULL) { \
-			*(type *)target = (type)value; \
-		} else if ((cmd->flags & WUY_CFLUA_FLAG_UNIQ_MEMBER) != 0) { \
-			if (*(type *)target) { \
-				return WUY_CFLUA_ERR_DEPLICATE_MEMBER; \
-			} \
-			*(type *)target = (type)value; \
-		} else { \
-			if (!wuy_array_yet_init(target)) \
-				wuy_array_init(target, sizeof(type)); \
-			type *p = wuy_array_push(target); \
-			*p = value; \
-		} \
-	} while (0)
+#define wuy_cflua_assign_value(cmd, container, value) \
+	*(typeof(value) *)(((char *)container) + (cmd)->offset) = value
 
 static int wuy_cflua_set_function(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
@@ -69,38 +53,97 @@ static int wuy_cflua_set_function(lua_State *L, struct wuy_cflua_command *cmd, v
 		wuy_dict_add(wuy_cflua_reuse_dict, node);
 	}
 
-	wuy_cflua_assign_value(cmd, container, node->u.func, wuy_cflua_function_t);
+	wuy_cflua_assign_value(cmd, container, node->u.func);
 	return 0;
 }
 static int wuy_cflua_set_string(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
 	char *value = strdup(lua_tostring(L, -1));
-	wuy_cflua_assign_value(cmd, container, value, char *);
+	wuy_cflua_assign_value(cmd, container, value);
 	return 0;
 }
 static int wuy_cflua_set_boolean(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
 	bool value = lua_toboolean(L, -1);
-	wuy_cflua_assign_value(cmd, container, value, bool);
+	wuy_cflua_assign_value(cmd, container, value);
 	return 0;
 }
 static int wuy_cflua_set_integer(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
-	lua_Number value = lua_tonumber(L, -1);
-	wuy_cflua_assign_value(cmd, container, value, int);
+	lua_Number nvalue = lua_tonumber(L, -1);
+	int ivalue = (int)nvalue;
+	wuy_cflua_assign_value(cmd, container, ivalue);
 	return 0;
 }
-static int wuy_cflua_set_float(lua_State *L, struct wuy_cflua_command *cmd, void *container)
+static int wuy_cflua_set_double(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
-	lua_Number value = lua_tonumber(L, -1);
-	wuy_cflua_assign_value(cmd, container, value, double);
+	lua_Number nvalue = lua_tonumber(L, -1);
+	double dvalue = (double)nvalue;
+	wuy_cflua_assign_value(cmd, container, dvalue);
 	return 0;
 }
 
 static int wuy_cflua_set_types(lua_State *L, struct wuy_cflua_command *cmd, void *container);
 
+static size_t wuy_cflua_type_size(enum wuy_cflua_type type)
+{
+	switch (type) {
+	case WUY_CFLUA_TYPE_BOOLEAN: return sizeof(bool);
+	case WUY_CFLUA_TYPE_INTEGER: return sizeof(int);
+	case WUY_CFLUA_TYPE_DOUBLE: return sizeof(double);
+	case WUY_CFLUA_TYPE_STRING: return sizeof(char *);
+	case WUY_CFLUA_TYPE_FUNCTION: return sizeof(wuy_cflua_function_t);
+	case WUY_CFLUA_TYPE_TABLE: return sizeof(void *);
+	default: abort();
+	}
+}
+
 static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
+	/* check if there any members.
+	 * use lua_gettable() which searchs metatable too */
+	lua_pushinteger(L, 1);
+	lua_gettable(L, -2);
+	bool is_nil = lua_isnil(L, -1);
+	lua_pop(L, 1);
+	if (is_nil) {
+		return 0;
+	}
+
+	/* find the real table */
+	size_t objlen;
+	int meta_level = 0;
+	while ((objlen = lua_objlen(L, -1)) == 0) {
+		lua_getmetatable(L, -1);
+
+		meta_level++;
+		if (meta_level > 10) {
+			return WUY_CFLUA_ERR_TOO_DEEP_META;
+		}
+	}
+
+	/* OK, now let's read the array members */
+
+	/* unique-member, just assign the single value */
+	if (cmd->flags & WUY_CFLUA_FLAG_UNIQ_MEMBER) {
+		if (objlen != 1) {
+			return WUY_CFLUA_ERR_DEPLICATE_MEMBER;
+		}
+		lua_rawgeti(L, -1, 1);
+		wuy_cflua_set_types(L, cmd, container);
+		lua_pop(L, 1);
+		goto out;
+	}
+
+	/* multi-members array.
+	 * allocate an array for the values, and assign the array to target */
+	size_t type_size = wuy_cflua_type_size(cmd->type);
+	void *array = calloc(objlen + 1, type_size);
+	wuy_cflua_assign_value(cmd, container, array);
+
+	struct wuy_cflua_command fake = *cmd;
+	fake.offset = 0;
+
 	int i = 1;
 	while (1) {
 		lua_rawgeti(L, -1, i++);
@@ -108,31 +151,23 @@ static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *c
 			lua_pop(L, 1);
 			break;
 		}
-		int ret = wuy_cflua_set_types(L, cmd, container);
+		int ret = wuy_cflua_set_types(L, &fake, array);
 		if (ret != 0) {
 			return ret;
 		}
 		lua_pop(L, 1);
+		fake.offset += type_size;
 	}
 
-	/* return if raw member exist; otherwise try metatable */
-	if (i > 2) {
-		return 0;
+	if (cmd->array_num_offset != 0) {
+		fake.type = WUY_CFLUA_TYPE_INTEGER;
+		fake.offset = cmd->array_num_offset;
+		wuy_cflua_assign_value(&fake, container, objlen);
 	}
 
-	i = 1;
-	while (1) {
-		lua_pushinteger(L, i++);
-		lua_gettable(L, -2);
-		if (lua_isnil(L, -1)) {
-			lua_pop(L, 1);
-			break;
-		}
-		int ret = wuy_cflua_set_types(L, cmd, container);
-		if (ret != 0) {
-			return ret;
-		}
-		lua_pop(L, 1);
+out:
+	if (meta_level > 0) {
+		lua_pop(L, meta_level);
 	}
 	return 0;
 }
@@ -141,7 +176,6 @@ static int wuy_cflua_set_option(lua_State *L, struct wuy_cflua_command *cmd, voi
 {
 	lua_getfield(L, -1, cmd->name);
 	if (lua_isnil(L, -1)) {
-		printf("invalid table: %s\n", cmd->name);
 		return WUY_CFLUA_ERR_INVALID_TABLE;
 	}
 	int ret = wuy_cflua_set_types(L, cmd, container);
@@ -163,7 +197,7 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 		if ((cmd->flags & WUY_CFLUA_FLAG_TABLE_REUSE) != 0) {
 			struct wuy_cflua_reuse_node *node = wuy_dict_get(wuy_cflua_reuse_dict, pointer);
 			if (node != NULL) {
-				wuy_cflua_assign_value(cmd, container, node->u.container, void *);
+				wuy_cflua_assign_value(cmd, container, node->u.container);
 				return 0;
 			}
 		}
@@ -175,7 +209,7 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 			return WUY_CFLUA_ERR_NO_MEM;
 		}
 
-		wuy_cflua_assign_value(cmd, out, container, void *);
+		wuy_cflua_assign_value(cmd, out, container);
 
 		if ((cmd->flags & WUY_CFLUA_FLAG_TABLE_REUSE) != 0) {
 			struct wuy_cflua_reuse_node *node = malloc(sizeof(struct wuy_cflua_reuse_node));
@@ -226,8 +260,8 @@ static int wuy_cflua_set_types(lua_State *L, struct wuy_cflua_command *cmd, void
 		return wuy_cflua_set_boolean(L, cmd, container);
 	case WUY_CFLUA_TYPE_INTEGER:
 		return wuy_cflua_set_integer(L, cmd, container);
-	case WUY_CFLUA_TYPE_FLOAT:
-		return wuy_cflua_set_float(L, cmd, container);
+	case WUY_CFLUA_TYPE_DOUBLE:
+		return wuy_cflua_set_double(L, cmd, container);
 	case WUY_CFLUA_TYPE_STRING:
 		return wuy_cflua_set_string(L, cmd, container);
 	case WUY_CFLUA_TYPE_FUNCTION:
