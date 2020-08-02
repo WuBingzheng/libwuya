@@ -142,10 +142,9 @@ static inline wuy_slist_node_t *wuy_slist_pop(wuy_slist_t *list)
  * @param member  name of wuy_slist_node_t member in user's struct.
  */
 #define wuy_slist_iter_type(list, p, member) \
-	for (p = wuy_containerof((list)->first, typeof(*p), member); \
-			p->member.next != NULL; \
-			p = wuy_containerof(p->member.next, typeof(*p), member))
-
+	for (wuy_slist_node_t *_node = (list)->first; \
+			p = wuy_containerof(_node, typeof(*p), member), _node != NULL; \
+			_node = _node->next)
 
 /**
  * @brief Iterate over a list.
@@ -156,7 +155,7 @@ static inline wuy_slist_node_t *wuy_slist_pop(wuy_slist_t *list)
  */
 #define wuy_slist_iter_prev_type(list, p, member, pprev) \
 	for (pprev = &((list)->first); \
-			*pprev != NULL && (p = wuy_containerof(*pprev, typeof(*p), member)); \
+			p = wuy_containerof(*pprev, typeof(*p), member), *pprev != NULL; \
 			pprev = (*pprev == node) ? &(node->next) : pprev)
 
 /**
