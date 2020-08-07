@@ -205,6 +205,12 @@ static inline wuy_list_node_t *wuy_list_last(const wuy_list_t *list)
 	return wuy_list_empty(list) ? NULL : list->head.prev;
 }
 
+static inline wuy_list_node_t *wuy_list_next(wuy_list_t *list, wuy_list_node_t *node)
+{
+	node = node->next;
+	return node == &(list->head) ? NULL : node;
+}
+
 /**
  * @brief Iterate over a list.
  *

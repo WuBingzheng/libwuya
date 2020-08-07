@@ -15,6 +15,7 @@
 #define WUY_SOCKADDR_H
 
 #include <stdbool.h>
+#include <string.h>
 #include <sys/socket.h>
 
 /**
@@ -42,5 +43,23 @@ bool wuy_sockaddr_pton(const char *str, struct sockaddr *out, unsigned short def
  * @return -1 on fail, or the length of string, excluding the null byte.
  */
 int wuy_sockaddr_ntop(const struct sockaddr *sa, char *buf, int size);
+
+/**
+ * @brief return size of address by sa->sa_family.
+ */
+size_t wuy_sockaddr_size(const struct sockaddr *sa);
+
+/**
+ * @brief compare 2 address, include port
+ */
+static inline int wuy_sockaddr_cmp(const struct sockaddr *sa, const struct sockaddr *sb)
+{
+	return memcmp(sa, sb, wuy_sockaddr_size(sa));
+}
+
+/**
+ * @brief compare 2 address, exclude port
+ */
+int wuy_sockaddr_addrcmp(const struct sockaddr *sa, const struct sockaddr *sb);
 
 #endif

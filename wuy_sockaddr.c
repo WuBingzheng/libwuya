@@ -7,9 +7,11 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <sys/un.h>
 #include <stdio.h>
 #include <strings.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "wuy_sockaddr.h"
 
@@ -121,26 +123,76 @@ bool wuy_sockaddr_pton(const char *str, struct sockaddr *out, unsigned short def
 
 int wuy_sockaddr_ntop(const struct sockaddr *sa, char *buf, int size)
 {
+	unsigned short port;
+	int len;
 	if (sa->sa_family == AF_INET) {
 		struct sockaddr_in *sain = (struct sockaddr_in *)sa;
 		if (inet_ntop(AF_INET, &sain->sin_addr, buf, size) == NULL) {
 			return -1;
 		}
-		int ip_len = strlen(buf);
-		return snprintf(buf + ip_len, size - ip_len, ":%d",
-				ntohs(sain->sin_port)) + ip_len;
+		len = strlen(buf);
+		port = sain->sin_port;
 
 	} else if (sa->sa_family == AF_INET6) {
 		struct sockaddr_in6 *sain6 = (struct sockaddr_in6 *)sa;
 		buf[0] = '[';
-		if (inet_ntop(AF_INET6, &sain6->sin6_addr, buf + 1, size - 1) == NULL) {
+		if (inet_ntop(AF_INET6, &sain6->sin6_addr, buf + 1, size - 2) == NULL) {
 			return -1;
 		}
-		int ip_len = strlen(buf);
-		return snprintf(buf + ip_len, size - ip_len, "]:%d",
-				ntohs(sain6->sin6_port)) + ip_len;
+		len = strlen(buf);
+		port = sain6->sin6_port;
+		buf[len++] = ']';
+		buf[len] = '\0';
 
 	} else {
 		return -2;
+	}
+
+	if (port != 0) {
+		len += snprintf(buf + len, size - len, ":%d", ntohs(port));
+	}
+	return len;
+}
+
+size_t wuy_sockaddr_size(const struct sockaddr *sa)
+{
+	switch (sa->sa_family) {
+	case AF_INET:
+		return sizeof(struct sockaddr_in);
+	case AF_INET6:
+		return sizeof(struct sockaddr_in6);
+	case AF_UNIX:
+		return sizeof(struct sockaddr_un);
+	default:
+		abort();
+	}
+}
+
+int wuy_sockaddr_addrcmp(const struct sockaddr *sa, const struct sockaddr *sb)
+{
+	if (sa->sa_family < sb->sa_family) {
+		return -1;
+	}
+	if (sa->sa_family > sb->sa_family) {
+		return 1;
+	}
+	switch (sa->sa_family) {
+	case AF_INET: {
+		const struct sockaddr_in *sina = (const void *)sa;
+		const struct sockaddr_in *sinb = (const void *)sb;
+		return memcmp(&sina->sin_addr, &sinb->sin_addr, sizeof(sina->sin_addr));
+	}
+	case AF_INET6: {
+		const struct sockaddr_in6 *sin6a = (const void *)sa;
+		const struct sockaddr_in6 *sin6b = (const void *)sb;
+		return memcmp(&sin6a->sin6_addr, &sin6b->sin6_addr, sizeof(sin6a->sin6_addr));
+	}
+	case AF_UNIX: {
+		const struct sockaddr_un *suna = (const void *)sa;
+		const struct sockaddr_un *sunb = (const void *)sb;
+		return memcmp(&suna->sun_path, &sunb->sun_path, sizeof(suna->sun_path));
+	}
+	default:
+		abort();
 	}
 }
