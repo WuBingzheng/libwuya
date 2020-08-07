@@ -137,7 +137,7 @@ static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *c
 
 	/* multi-members array.
 	 * allocate an array for the values, and assign the array to target */
-	size_t type_size = wuy_cflua_type_size(cmd->type);
+	size_t type_size = cmd->array_member_size ? cmd->array_member_size : wuy_cflua_type_size(cmd->type);
 	void *array = calloc(objlen + 1, type_size);
 	wuy_cflua_assign_value(cmd, container, array);
 
@@ -159,9 +159,9 @@ static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *c
 		fake.offset += type_size;
 	}
 
-	if (cmd->array_num_offset != 0) {
+	if (cmd->array_number_offset != 0) {
 		fake.type = WUY_CFLUA_TYPE_INTEGER;
-		fake.offset = cmd->array_num_offset;
+		fake.offset = cmd->array_number_offset;
 		wuy_cflua_assign_value(&fake, container, objlen);
 	}
 

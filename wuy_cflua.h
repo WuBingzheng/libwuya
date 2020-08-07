@@ -52,7 +52,8 @@ struct wuy_cflua_command {
 	int			offset;
 
 	/* offset of number of array members. only for array member command. */
-	int			array_num_offset;
+	int			array_number_offset;
+	int			array_member_size;
 
 	union {
 		/* only for WUY_CFLUA_TYPE_TABLE */
