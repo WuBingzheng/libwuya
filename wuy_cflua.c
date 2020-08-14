@@ -19,25 +19,17 @@ struct wuy_cflua_reuse_node {
 
 static wuy_dict_t *wuy_cflua_reuse_dict;
 
+/* table-stack for wuy_cflua_strerror() */
+static struct wuy_cflua_stack {
+	struct wuy_cflua_command	*cmd;
+	void				*container;
+} wuy_cflua_stacks[100];
+static int wuy_cflua_stack_index = 0;
 
-#if 0
-
-/* command stack */
-typedef struct {
-	struct wuy_cflua_command		*cmd;
-	void			*container;
-} wuy_cflua_command_stack_t;
-
-#define WUY_CFLUA_COMMAND_STACK_MAXSIZE 100
-static int wuy_cflua_command_stack_depth;
-static wuy_cflua_command_stack_t wuy_cflua_command_stack[WUY_CFLUA_COMMAND_STACK_MAXSIZE];
+static struct wuy_cflua_command	*wuy_cflua_current_cmd;
 
 
-/* remember all table to destroy */
-static wuy_array_t wuy_cflua_tables;
-#endif
-
-
+/* assign value for different types */
 #define wuy_cflua_assign_value(cmd, container, value) \
 	*(typeof(value) *)(((char *)container) + (cmd)->offset) = value
 
@@ -70,16 +62,21 @@ static int wuy_cflua_set_boolean(lua_State *L, struct wuy_cflua_command *cmd, vo
 }
 static int wuy_cflua_set_integer(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
+	/* we assume that lua_Number is double */
 	lua_Number nvalue = lua_tonumber(L, -1);
 	int ivalue = (int)nvalue;
+	if (nvalue != (lua_Number)ivalue) {
+		return WUY_CFLUA_ERR_WRONG_TYPE;
+	}
+
 	wuy_cflua_assign_value(cmd, container, ivalue);
 	return 0;
 }
 static int wuy_cflua_set_double(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
-	lua_Number nvalue = lua_tonumber(L, -1);
-	double dvalue = (double)nvalue;
-	wuy_cflua_assign_value(cmd, container, dvalue);
+	/* we assume that lua_Number is double */
+	lua_Number value = lua_tonumber(L, -1);
+	wuy_cflua_assign_value(cmd, container, value);
 	return 0;
 }
 
@@ -130,7 +127,10 @@ static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *c
 			return WUY_CFLUA_ERR_DEPLICATE_MEMBER;
 		}
 		lua_rawgeti(L, -1, 1);
-		wuy_cflua_set_types(L, cmd, container);
+		int ret = wuy_cflua_set_types(L, cmd, container);
+		if (ret != 0) {
+			return ret;
+		}
 		lua_pop(L, 1);
 		goto out;
 	}
@@ -143,6 +143,7 @@ static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *c
 
 	struct wuy_cflua_command fake = *cmd;
 	fake.offset = 0;
+	fake.real = cmd;
 
 	int i = 1;
 	while (1) {
@@ -176,7 +177,8 @@ static int wuy_cflua_set_option(lua_State *L, struct wuy_cflua_command *cmd, voi
 {
 	lua_getfield(L, -1, cmd->name);
 	if (lua_isnil(L, -1)) {
-		return WUY_CFLUA_ERR_INVALID_TABLE;
+		lua_pop(L, 1);
+		return 0;
 	}
 	int ret = wuy_cflua_set_types(L, cmd, container);
 	if (ret != 0) {
@@ -188,6 +190,10 @@ static int wuy_cflua_set_option(lua_State *L, struct wuy_cflua_command *cmd, voi
 
 static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
+	wuy_cflua_stacks[wuy_cflua_stack_index].cmd = cmd->real ? cmd->real : cmd;
+	wuy_cflua_stacks[wuy_cflua_stack_index].container = (char *)container + cmd->offset;
+	wuy_cflua_stack_index++;
+
 	struct wuy_cflua_table *table = cmd->u.table;
 
 	/* create new container */
@@ -198,7 +204,7 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 			struct wuy_cflua_reuse_node *node = wuy_dict_get(wuy_cflua_reuse_dict, pointer);
 			if (node != NULL) {
 				wuy_cflua_assign_value(cmd, container, node->u.container);
-				return 0;
+				goto out;
 			}
 		}
 
@@ -250,11 +256,30 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 		}
 	}
 
+out:
+	wuy_cflua_stack_index--;
 	return 0;
 }
 
+static bool wuy_cflua_check_type(lua_State *L, struct wuy_cflua_command *cmd)
+{
+	int type = lua_type(L, -1);
+	if (type == cmd->type) {
+		return true;
+	}
+	if (type == LUA_TNUMBER && cmd->type == WUY_CFLUA_TYPE_INTEGER) {
+		return true;
+	}
+	return false;
+}
 static int wuy_cflua_set_types(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
+	wuy_cflua_current_cmd = cmd;
+
+	if (!wuy_cflua_check_type(L, cmd)) {
+		return WUY_CFLUA_ERR_WRONG_TYPE;
+	}
+
 	switch (cmd->type) {
 	case WUY_CFLUA_TYPE_BOOLEAN:
 		return wuy_cflua_set_boolean(L, cmd, container);
@@ -284,4 +309,68 @@ int wuy_cflua_parse(lua_State *L, struct wuy_cflua_command *cmd, void *container
 	wuy_dict_destroy(wuy_cflua_reuse_dict);
 
 	return ret;
+}
+
+static const char *wuy_cflua_strtype(enum wuy_cflua_type type)
+{
+	switch (type) {
+	case WUY_CFLUA_TYPE_END: return "!END";
+	case WUY_CFLUA_TYPE_BOOLEAN: return "boolean";
+	case WUY_CFLUA_TYPE_INTEGER: return "integer";
+	case WUY_CFLUA_TYPE_DOUBLE: return "double";
+	case WUY_CFLUA_TYPE_STRING: return "string";
+	case WUY_CFLUA_TYPE_FUNCTION: return "function";
+	case WUY_CFLUA_TYPE_TABLE: return "table";
+	default: return "invalid type!";
+	}
+}
+const char *wuy_cflua_strerror(lua_State *L, int err)
+{
+	static char buffer[3000];
+	char *p = buffer, *end = buffer + sizeof(buffer);
+
+	switch (err) {
+	case WUY_CFLUA_ERR_NO_MEM:
+		p += sprintf(p, "no-memory");
+		break;
+	case WUY_CFLUA_ERR_DEPLICATE_MEMBER:
+		p += sprintf(p, "duplicated member");
+		break;
+	case WUY_CFLUA_ERR_POST:
+		p += sprintf(p, "table post handler fails");
+		break;
+	case WUY_CFLUA_ERR_TOO_DEEP_META:
+		p += sprintf(p, "too deep metatable");
+		break;
+	case WUY_CFLUA_ERR_WRONG_TYPE:
+		p += sprintf(p, "wrong type of %s, get %s while expect %s",
+				wuy_cflua_current_cmd->name ? wuy_cflua_current_cmd->name : "array member",
+				lua_typename(L, lua_type(L, -1)),
+				wuy_cflua_strtype(wuy_cflua_current_cmd->type));
+		break;
+	default:
+		p += sprintf(p, "!!! impossible error code: %d", err);
+		return buffer;
+	}
+
+	p += sprintf(p, " at ");
+
+	for (int i = 0; i < wuy_cflua_stack_index; i++) {
+		struct wuy_cflua_stack *stack = &wuy_cflua_stacks[i];
+		struct wuy_cflua_command *cmd = stack->cmd;
+		if (cmd->u.table->name != NULL) {
+			p += cmd->u.table->name(*(void **)(stack->container), p, end - p);
+		} else if (cmd->name != NULL) {
+			p += snprintf(p, end - p, "%s>", cmd->name);
+		} else {
+			p += snprintf(p, end - p, "{?}>");
+		}
+	}
+
+	/* delete the last '>' */
+	if (p > buffer && p[-1] == '>') {
+		p[-1] = '.';
+	}
+
+	return buffer;
 }
