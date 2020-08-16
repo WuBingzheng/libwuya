@@ -100,4 +100,8 @@ const char *wuy_cflua_strerror(lua_State *L, int err);
 	.commands = (struct wuy_cflua_command[2]) { { .type = WUY_CFLUA_TYPE_STRING } } \
 }
 
+#define WUY_CFLUA_ARRAY_INTEGER_TABLE &(struct wuy_cflua_table) { \
+	.commands = (struct wuy_cflua_command[2]) { { .type = WUY_CFLUA_TYPE_INTEGER } } \
+}
+
 #endif

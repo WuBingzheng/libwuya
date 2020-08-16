@@ -196,8 +196,11 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 
 	struct wuy_cflua_table *table = cmd->u.table;
 
-	/* create new container */
-	if (table->size != 0) {
+	if (table->size == 0) { /* use this container with offset */
+		container = (char *)container + cmd->offset;
+
+	} else { /* allocate new container */
+
 		/* try to reuse */
 		const void *pointer = lua_topointer(L, -1);
 		if ((cmd->flags & WUY_CFLUA_FLAG_TABLE_REUSE) != 0) {
