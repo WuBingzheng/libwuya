@@ -63,6 +63,9 @@ struct wuy_cflua_command {
 	struct wuy_cflua_command	*real;
 
 	union {
+		/* only for WUY_CFLUA_TYPE_STRING */
+		int				length_offset;
+
 		/* only for WUY_CFLUA_TYPE_TABLE */
 		struct wuy_cflua_table		*table;
 

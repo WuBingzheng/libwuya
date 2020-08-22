@@ -50,8 +50,12 @@ static int wuy_cflua_set_function(lua_State *L, struct wuy_cflua_command *cmd, v
 }
 static int wuy_cflua_set_string(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
-	char *value = strdup(lua_tostring(L, -1));
+	size_t len;
+	char *value = strdup(lua_tolstring(L, -1, &len));
 	wuy_cflua_assign_value(cmd, container, value);
+	if (cmd->u.length_offset != 0) {
+		*(int *)((char *)container + cmd->u.length_offset) = len;
+	}
 	return 0;
 }
 static int wuy_cflua_set_boolean(lua_State *L, struct wuy_cflua_command *cmd, void *container)
