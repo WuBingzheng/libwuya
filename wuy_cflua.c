@@ -29,6 +29,8 @@ static int wuy_cflua_stack_index = 0;
 static struct wuy_cflua_command	*wuy_cflua_current_cmd;
 
 
+#define WUY_CFLUA_PINT(container, offset)	*(int *)((char *)(container) + offset)
+
 /* assign value for different types */
 #define wuy_cflua_assign_value(cmd, container, value) \
 	*(typeof(value) *)(((char *)container) + (cmd)->offset) = value
@@ -54,7 +56,7 @@ static int wuy_cflua_set_string(lua_State *L, struct wuy_cflua_command *cmd, voi
 	char *value = strdup(lua_tolstring(L, -1, &len));
 	wuy_cflua_assign_value(cmd, container, value);
 	if (cmd->u.length_offset != 0) {
-		*(int *)((char *)container + cmd->u.length_offset) = len;
+		WUY_CFLUA_PINT(container, cmd->u.length_offset) = len;
 	}
 	return 0;
 }
@@ -101,21 +103,14 @@ static size_t wuy_cflua_type_size(enum wuy_cflua_type type)
 
 static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
-	/* check if there any members.
-	 * use lua_gettable() which searchs metatable too */
-	lua_pushinteger(L, 1);
-	lua_gettable(L, -2);
-	bool is_nil = lua_isnil(L, -1);
-	lua_pop(L, 1);
-	if (is_nil) {
-		return 0;
-	}
-
 	/* find the real table */
 	size_t objlen;
 	int meta_level = 0;
 	while ((objlen = lua_objlen(L, -1)) == 0) {
-		lua_getmetatable(L, -1);
+		if (!lua_getmetatable(L, -1)) {
+			lua_pop(L, meta_level);
+			return 0;
+		}
 
 		meta_level++;
 		if (meta_level > 10) {
@@ -165,12 +160,13 @@ static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *c
 	}
 
 	if (cmd->array_number_offset != 0) {
-		fake.type = WUY_CFLUA_TYPE_INTEGER;
-		fake.offset = cmd->array_number_offset;
-		wuy_cflua_assign_value(&fake, container, objlen);
+		WUY_CFLUA_PINT(container, cmd->array_number_offset) = objlen;
+	}
+out:
+	if (cmd->meta_level_offset != 0) {
+		WUY_CFLUA_PINT(container, cmd->meta_level_offset) = meta_level;
 	}
 
-out:
 	if (meta_level > 0) {
 		lua_pop(L, meta_level);
 	}
@@ -189,6 +185,29 @@ static int wuy_cflua_set_option(lua_State *L, struct wuy_cflua_command *cmd, voi
 		return ret;
 	}
 	lua_pop(L, 1);
+
+	/* calculate meta_level */
+	if (cmd->meta_level_offset != 0) {
+		int meta_level = 0;
+		while (1) {
+			lua_pushstring(L, cmd->name);
+			lua_rawget(L, -2);
+			if (!lua_isnil(L, -1)) {
+				lua_pop(L, 1);
+				break;
+			}
+			lua_pop(L, 1);
+
+			meta_level++;
+			lua_getmetatable(L, -1);
+		}
+		if (meta_level > 0) {
+			lua_pop(L, meta_level);
+		}
+
+		WUY_CFLUA_PINT(container, cmd->meta_level_offset) = meta_level;
+	}
+
 	return 0;
 }
 

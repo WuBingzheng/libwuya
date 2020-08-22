@@ -53,18 +53,21 @@ struct wuy_cflua_command {
 	enum wuy_cflua_flag	flags;
 
 	/* offset of target member in container. */
-	int			offset;
+	off_t			offset;
 
-	/* only for multi-member array command. */
-	int			array_number_offset;
-	int			array_member_size;
+	/* OPTIONAL. offset of meta_level(int) */
+	off_t			meta_level_offset;
+
+	/* OPTIONAL. only for multi-member array command. */
+	off_t			array_number_offset;
+	size_t			array_member_size;
 
 	/* used internal */
 	struct wuy_cflua_command	*real;
 
 	union {
 		/* only for WUY_CFLUA_TYPE_STRING */
-		int				length_offset;
+		off_t				length_offset;
 
 		/* only for WUY_CFLUA_TYPE_TABLE */
 		struct wuy_cflua_table		*table;
