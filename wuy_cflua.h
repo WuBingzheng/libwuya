@@ -10,6 +10,7 @@
 #define WUY_CFLUA_ERR_POST		-3
 #define WUY_CFLUA_ERR_TOO_DEEP_META	-4
 #define WUY_CFLUA_ERR_WRONG_TYPE	-5
+#define WUY_CFLUA_ERR_LIMIT		-6
 
 /* `type` in `struct wuy_cflua_command` */
 enum wuy_cflua_type {
@@ -55,16 +56,7 @@ struct wuy_cflua_command {
 	/* offset of target member in container. */
 	off_t			offset;
 
-	/* OPTIONAL. offset of meta_level(int) */
-	off_t			meta_level_offset;
-
-	/* OPTIONAL. only for multi-member array command. */
-	off_t			array_number_offset;
-	size_t			array_member_size;
-
-	/* used internal */
-	struct wuy_cflua_command	*real;
-
+	/* extra settings for types */
 	union {
 		/* only for WUY_CFLUA_TYPE_STRING */
 		off_t				length_offset;
@@ -75,6 +67,39 @@ struct wuy_cflua_command {
 		/* only for WUY_CFLUA_TYPE_END */
 		struct wuy_cflua_command	*(*next)(struct wuy_cflua_command *);
 	} u;
+
+	/* -- OPTIONAL -- */
+
+	/* offset of meta_level(int) */
+	off_t			meta_level_offset;
+
+	/* only for multi-member array command. */
+	off_t			array_number_offset;
+	size_t			array_member_size;
+
+	/* default values, only for key-value options, but not array members */
+	union {
+		bool			b;
+		int			n;
+		double			d;
+		wuy_cflua_function_t	f;
+		const char		*s;
+	} default_value;
+
+	/* limits, only for WUY_CFLUA_TYPE_INTEGER and WUY_CFLUA_TYPE_DOUBLE */
+	union {
+		struct {
+			bool	is_lower, is_upper;
+			int	lower, upper;
+		} n;
+		struct {
+			bool	is_lower, is_upper;
+			double	lower, upper;
+		} d;
+	} limits;
+
+	/* used internal */
+	struct wuy_cflua_command	*real;
 };
 
 struct wuy_cflua_table {
@@ -102,6 +127,11 @@ int wuy_cflua_parse(lua_State *L, struct wuy_cflua_command *cmd, void *container
 /* param err  is returned by wuy_cflua_parse(). */
 const char *wuy_cflua_strerror(lua_State *L, int err);
 
+static inline bool wuy_cflua_is_function_set(wuy_cflua_function_t f)
+{
+	return f != 0;
+}
+
 #define WUY_CFLUA_ARRAY_STRING_TABLE &(struct wuy_cflua_table) { \
 	.commands = (struct wuy_cflua_command[2]) { { .type = WUY_CFLUA_TYPE_STRING } } \
 }
@@ -109,5 +139,13 @@ const char *wuy_cflua_strerror(lua_State *L, int err);
 #define WUY_CFLUA_ARRAY_INTEGER_TABLE &(struct wuy_cflua_table) { \
 	.commands = (struct wuy_cflua_command[2]) { { .type = WUY_CFLUA_TYPE_INTEGER } } \
 }
+
+#define WUY_CFLUA_LIMITS(l, u)		{ .is_lower = true, .is_upper = true, .lower = l, .upper = u }
+#define WUY_CFLUA_LIMITS_LOWER(n)	{ .is_lower = true, .lower = n }
+#define WUY_CFLUA_LIMITS_UPPER(n)	{ .is_upper = true, .upper = n }
+#define WUY_CFLUA_LIMITS_POSITIVE	WUY_CFLUA_LIMITS_LOWER(1)
+#define WUY_CFLUA_LIMITS_NON_NEGATIVE	WUY_CFLUA_LIMITS_LOWER(0)
+
+void wuy_cflua_build_tables(lua_State *L, struct wuy_cflua_table *table);
 
 #endif
