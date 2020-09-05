@@ -112,7 +112,7 @@ static inline void wuy_json_array_close(wuy_json_ctx_t *ctx)
  */
 static inline int wuy_json_done(wuy_json_ctx_t *ctx)
 {
-	if (ctx->pos > ctx->end) {
+	if (ctx->pos >= ctx->end) {
 		return ctx->end - ctx->start;
 	}
 
