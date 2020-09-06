@@ -3,21 +3,7 @@
 #include <lua5.1/lua.h>
 #include <lua5.1/lauxlib.h>
 
-#include "wuy_dict.h"
-
 #include "wuy_cflua.h"
-
-/* to reuse table or function */
-struct wuy_cflua_reuse_node {
-	wuy_dict_node_t		hash_node;
-	const void		*pointer;
-	union {
-		void			*container;
-		wuy_cflua_function_t	func;
-	} u;
-};
-
-static wuy_dict_t *wuy_cflua_reuse_dict;
 
 /* table-stack for wuy_cflua_strerror() */
 static struct wuy_cflua_stack {
@@ -28,7 +14,6 @@ static int wuy_cflua_stack_index = 0;
 
 static struct wuy_cflua_command	*wuy_cflua_current_cmd;
 
-
 #define WUY_CFLUA_PINT(container, offset)	*(int *)((char *)(container) + offset)
 
 /* assign value for different types */
@@ -37,17 +22,8 @@ static struct wuy_cflua_command	*wuy_cflua_current_cmd;
 
 static int wuy_cflua_set_function(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
-	const void *pointer = lua_topointer(L, -1);
-	struct wuy_cflua_reuse_node *node = wuy_dict_get(wuy_cflua_reuse_dict, pointer);
-	if (node == NULL) {
-		node = malloc(sizeof(struct wuy_cflua_reuse_node));
-		node->pointer = pointer;
-		lua_pushvalue(L, -1); /* luaL_ref() will pop it */
-		node->u.func = luaL_ref(L, LUA_REGISTRYINDEX);
-		wuy_dict_add(wuy_cflua_reuse_dict, node);
-	}
-
-	wuy_cflua_assign_value(cmd, container, node->u.func);
+	lua_pushvalue(L, -1);
+	wuy_cflua_assign_value(cmd, container, luaL_ref(L, LUA_REGISTRYINDEX));
 	return 0;
 }
 static int wuy_cflua_set_string(lua_State *L, struct wuy_cflua_command *cmd, void *container)
@@ -256,33 +232,31 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 	if (table->size == 0) { /* use this container with offset */
 		container = (char *)container + cmd->offset;
 
-	} else { /* allocate new container */
+	} else { /* reuse or allocate new container */
 
-		/* try to reuse */
-		const void *pointer = lua_topointer(L, -1);
-		if ((cmd->flags & WUY_CFLUA_FLAG_TABLE_REUSE) != 0) {
-			struct wuy_cflua_reuse_node *node = wuy_dict_get(wuy_cflua_reuse_dict, pointer);
-			if (node != NULL) {
-				wuy_cflua_assign_value(cmd, container, node->u.container);
-				goto out;
-			}
+		/* try to reuse the exist container */
+		lua_pushvalue(L, -1);
+		lua_gettable(L, LUA_REGISTRYINDEX);
+		void *hit = lua_touserdata(L, -1);
+		lua_pop(L, 1);
+		if (hit != NULL) {
+			wuy_cflua_assign_value(cmd, container, hit);
+			goto out;
 		}
 
-		void *out = container;
-
-		container = calloc(1, table->size);
-		if (container == NULL) {
+		/* allocate new container */
+		void *new_container = calloc(1, table->size);
+		if (new_container == NULL) {
 			return WUY_CFLUA_ERR_NO_MEM;
 		}
 
-		wuy_cflua_assign_value(cmd, out, container);
+		wuy_cflua_assign_value(cmd, container, new_container);
+		container = new_container;
 
-		if ((cmd->flags & WUY_CFLUA_FLAG_TABLE_REUSE) != 0) {
-			struct wuy_cflua_reuse_node *node = malloc(sizeof(struct wuy_cflua_reuse_node));
-			node->pointer = pointer;
-			node->u.container = container;
-			wuy_dict_add(wuy_cflua_reuse_dict, node);
-		}
+		/* cache it for reuse later */
+		lua_pushvalue(L, -1);
+		lua_pushlightuserdata(L, container);
+		lua_settable(L, LUA_REGISTRYINDEX);
 	}
 
 	if (table->init != NULL) {
@@ -386,15 +360,7 @@ static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *
 
 int wuy_cflua_parse(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
-	wuy_cflua_reuse_dict = wuy_dict_new_type(WUY_DICT_KEY_POINTER,
-			offsetof(struct wuy_cflua_reuse_node, pointer),
-			offsetof(struct wuy_cflua_reuse_node, hash_node));
-
-	int ret = wuy_cflua_set_table(L, cmd, container);
-
-	wuy_dict_destroy(wuy_cflua_reuse_dict);
-
-	return ret;
+	return wuy_cflua_set_table(L, cmd, container);
 }
 
 static const char *wuy_cflua_strtype(enum wuy_cflua_type type)
