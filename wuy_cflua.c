@@ -23,7 +23,8 @@ static struct wuy_cflua_command	*wuy_cflua_current_cmd;
 static int wuy_cflua_set_function(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
 	lua_pushvalue(L, -1);
-	wuy_cflua_assign_value(cmd, container, luaL_ref(L, LUA_REGISTRYINDEX));
+	wuy_cflua_function_t f = luaL_ref(L, LUA_REGISTRYINDEX);
+	wuy_cflua_assign_value(cmd, container, f);
 	return 0;
 }
 static int wuy_cflua_set_string(lua_State *L, struct wuy_cflua_command *cmd, void *container)
@@ -334,6 +335,10 @@ static int wuy_cflua_set_types(lua_State *L, struct wuy_cflua_command *cmd, void
 
 static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
+	if (cmd->default_value.s == NULL) {
+		return;
+	}
+
 	switch (cmd->type) {
 	case WUY_CFLUA_TYPE_BOOLEAN:
 		wuy_cflua_assign_value(cmd, container, cmd->default_value.b);
@@ -346,6 +351,9 @@ static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *
 		return;
 	case WUY_CFLUA_TYPE_STRING:
 		wuy_cflua_assign_value(cmd, container, cmd->default_value.s);
+		if (cmd->u.length_offset != 0) {
+			WUY_CFLUA_PINT(container, cmd->u.length_offset) = strlen(cmd->default_value.s);
+		}
 		return;
 	case WUY_CFLUA_TYPE_FUNCTION:
 		wuy_cflua_assign_value(cmd, container, cmd->default_value.f);
