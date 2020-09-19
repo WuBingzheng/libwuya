@@ -1,5 +1,6 @@
 #define _XOPEN_SOURCE
 #define _BSD_SOURCE
+#define _GNU_SOURCE // memrchr()
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
@@ -54,6 +55,166 @@ int wuy_http_version(const char *buf, int len)
 	default:
 		return WUY_HTTP_ERROR;
 	}
+}
+
+static int wuy_http_char_hex(char c)
+{
+	if (c >= '0' && c <= '9') {
+		return c - '0';
+	}
+	if (c >= 'a' && c <= 'z') {
+		return c - 'a' + 10;
+	}
+	if (c >= 'A' && c <= 'Z') {
+		return c - 'A' + 10;
+	}
+	return -1;
+}
+
+/* TODO this does not follow RFC... */
+int wuy_http_decode_path(char *dest, const char *src, int len)
+{
+	char *p = dest;
+	for (int i = 0; i < len; i++) {
+		char c = src[i];
+		if (c == '\0') {
+			break;
+		}
+		if (c < 0) { /* not ascii */
+			return WUY_HTTP_ERROR;
+		}
+		if (c <= 0x20 || c == 0x7F) {
+			return WUY_HTTP_ERROR;
+		}
+		if (c == '%') {
+			if (i + 2 >= len) {
+				return WUY_HTTP_ERROR;
+			}
+			int n1 = wuy_http_char_hex(src[++i]);
+			int n2 = wuy_http_char_hex(src[++i]);
+			if (n1 < 0 || n2 < 0) {
+				return WUY_HTTP_ERROR;
+			}
+			c = n1 * 16 + n2;
+		}
+		if (c == '/' && p - dest >= 1) {
+			char lastc = p[-1];
+			if (lastc == '/') {
+				/* merge "//" */
+				continue;
+			}
+			if (lastc == '.') {
+				if (p - dest == 1) { /* should not happen */
+					return WUY_HTTP_ERROR;
+				}
+				char last2 = p[-2];
+				if (last2 == '/') {
+					/* merge "/./" */
+					p--;
+					continue;
+				}
+				if (last2 == '.' && p[-3] == '/') {
+					/* go up level for "/../" */
+					p = memrchr(dest, '/', p - dest - 3);
+					if (p == NULL) {
+						return WUY_HTTP_ERROR;
+					}
+					continue;
+				}
+			}
+		}
+
+		*p++ = c;
+	}
+
+	if (p - dest >= 3 && p[-3]=='/' && p[-2]=='.' && p[-1]=='.') {
+		/* go up level for "/..$" */
+		p = memrchr(dest, '/', p - dest - 3);
+		if (p == NULL) {
+			return WUY_HTTP_ERROR;
+		}
+	}
+
+	*p = '\0';
+	return p - dest;
+}
+
+int wuy_http_uri(const char *uri, int len, const char **p_host,
+		const char **p_path, const char **p_query, const char **p_fragment)
+{
+	if (len == 0) {
+		return WUY_HTTP_ERROR;
+	}
+
+	/* special "*" */
+	if (uri[0] == '*') {
+		if (len != 1) {
+			return WUY_HTTP_ERROR;
+		}
+		*p_path = uri;
+		*p_host = NULL;
+		*p_query = NULL;
+		*p_fragment = NULL;
+		return 1;
+	}
+	
+	/* scheme and host */
+	const char *p = uri;
+	const char *end = uri + len;
+	if (p[0] != '/') {
+		if (memcmp(p, "http://", 7) == 0) {
+			p += 7;
+		} else if(memcmp(p, "https://", 8) == 0) {
+			p += 8;
+		} else {
+			return WUY_HTTP_ERROR;
+		}
+		if (p >= end) {
+			return WUY_HTTP_ERROR;
+		}
+
+		*p_host = p;
+
+		const char *stop = memchr(p, '/', end - p);
+		if (stop == NULL) {
+			return WUY_HTTP_ERROR;
+		}
+		p = stop;
+
+	} else {
+		*p_host = NULL;
+	}
+
+	/* path */
+	*p_path = p;
+	int path_len = 0;
+
+	/* optional query */
+	const char *stop = memchr(p, '?', end - p);
+	if (stop != NULL) {
+		path_len = stop - p;
+		*p_query = p;
+		p = stop;
+	} else {
+		*p_query = NULL;
+	}
+
+	/* URI: optional fragment */
+	stop = memchr(p, '#', end - p);
+	if (stop != NULL) {
+		if (path_len == 0) {
+			path_len = stop - p;
+		}
+		*p_fragment = p;
+		p = stop;
+	} else {
+		*p_fragment = NULL;
+	}
+
+	if (path_len == 0) {
+		path_len = end - p;
+	}
+	return path_len;
 }
 
 int wuy_http_request_line(const char *buf, int len, enum wuy_http_method *out_method,
