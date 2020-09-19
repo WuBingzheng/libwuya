@@ -434,6 +434,28 @@ const char *wuy_cflua_strerror(lua_State *L, int err)
 				lua_typename(L, lua_type(L, -1)),
 				wuy_cflua_strtype(wuy_cflua_current_cmd->type));
 		break;
+	case WUY_CFLUA_ERR_LIMIT:
+		p += sprintf(p, "%s out of range: ", wuy_cflua_current_cmd->name);
+		if (wuy_cflua_current_cmd->type == WUY_CFLUA_TYPE_INTEGER) {
+			struct wuy_cflua_command_limits_int *limits = &wuy_cflua_current_cmd->limits.n;
+			if (limits->is_lower && limits->is_upper) {
+				p += sprintf(p, "[%d, %d]", limits->lower, limits->upper);
+			} else if (limits->is_lower) {
+				p += sprintf(p, "[%d, -)", limits->lower);
+			} else {
+				p += sprintf(p, "(-, %d]", limits->upper);
+			}
+		} else {
+			struct wuy_cflua_command_limits_double *limits = &wuy_cflua_current_cmd->limits.d;
+			if (limits->is_lower && limits->is_upper) {
+				p += sprintf(p, "[%g, %g]", limits->lower, limits->upper);
+			} else if (limits->is_lower) {
+				p += sprintf(p, "[%g, -)", limits->lower);
+			} else {
+				p += sprintf(p, "(-, %g]", limits->upper);
+			}
+		}
+		break;
 	default:
 		p += sprintf(p, "!!! impossible error code: %d", err);
 		return buffer;
