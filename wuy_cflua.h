@@ -88,11 +88,11 @@ struct wuy_cflua_command {
 
 	/* limits, only for WUY_CFLUA_TYPE_INTEGER and WUY_CFLUA_TYPE_DOUBLE */
 	union {
-		struct {
+		struct wuy_cflua_command_limits_int {
 			bool	is_lower, is_upper;
 			int	lower, upper;
 		} n;
-		struct {
+		struct wuy_cflua_command_limits_double {
 			bool	is_lower, is_upper;
 			double	lower, upper;
 		} d;
