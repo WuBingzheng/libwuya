@@ -139,6 +139,39 @@ int wuy_http_decode_path(char *dest, const char *src, int len)
 	return p - dest;
 }
 
+int wuy_http_decode_query_value(char *dest, const char *src, int len)
+{
+	char *p = dest;
+	for (int i = 0; i < len; i++) {
+		char c = src[i];
+		if (c == '\0') {
+			break;
+		}
+		if (c < 0) { /* not ascii */
+			return WUY_HTTP_ERROR;
+		}
+		if (c <= 0x20 || c == 0x7F) {
+			return WUY_HTTP_ERROR;
+		}
+		if (c == '+') {
+			c = ' ';
+		} else if (c == '%') {
+			if (i + 2 >= len) {
+				return WUY_HTTP_ERROR;
+			}
+			int n1 = wuy_http_char_hex(src[++i]);
+			int n2 = wuy_http_char_hex(src[++i]);
+			if (n1 < 0 || n2 < 0) {
+				return WUY_HTTP_ERROR;
+			}
+			c = n1 * 16 + n2;
+		}
+		*p++ = c;
+	}
+	*p = '\0';
+	return p - dest;
+}
+
 int wuy_http_uri(const char *uri, int len, const char **p_host,
 		const char **p_path, const char **p_query, const char **p_fragment)
 {
@@ -193,8 +226,8 @@ int wuy_http_uri(const char *uri, int len, const char **p_host,
 	const char *stop = memchr(p, '?', end - p);
 	if (stop != NULL) {
 		path_len = stop - p;
-		*p_query = p;
 		p = stop;
+		*p_query = p;
 	} else {
 		*p_query = NULL;
 	}
@@ -205,8 +238,8 @@ int wuy_http_uri(const char *uri, int len, const char **p_host,
 		if (path_len == 0) {
 			path_len = stop - p;
 		}
-		*p_fragment = p;
 		p = stop;
+		*p_fragment = p;
 	} else {
 		*p_fragment = NULL;
 	}
@@ -215,6 +248,35 @@ int wuy_http_uri(const char *uri, int len, const char **p_host,
 		path_len = end - p;
 	}
 	return path_len;
+}
+
+int wuy_http_uri_query_get(const char *query_str, int query_len,
+		const char *key_str, int key_len, char *value_buf)
+{
+	if (query_str == NULL) {
+		return -1;
+	}
+
+	const char *p = query_str;
+	const char *end = query_str + query_len;
+	if (p[0] == '?') {
+		p++;
+	}
+
+	while (end - p > key_len) {
+		if (memcmp(p, key_str, key_len) == 0 && p[key_len] == '=') {
+			p += key_len + 1;
+			const char *next = memchr(p, '&', end - p);
+			int value_len = (next ? next : end) - p;
+			return wuy_http_decode_query_value(value_buf, p, value_len);
+		}
+		p = memchr(p, '&', end - p);
+		if (p == NULL) {
+			break;
+		}
+		p++;
+	}
+	return -1;
 }
 
 int wuy_http_request_line(const char *buf, int len, enum wuy_http_method *out_method,

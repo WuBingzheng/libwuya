@@ -112,6 +112,9 @@ int wuy_http_uri(const char *uri, int len, const char **p_host,
 
 int wuy_http_decode_path(char *dest, const char *src, int len);
 
+int wuy_http_uri_query_get(const char *query_str, int query_len,
+		const char *key_str, int key_len, char *value_buf);
+
 typedef struct {
 	int	state;
 	int	size;
