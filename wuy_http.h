@@ -25,6 +25,7 @@ enum wuy_http_method {
 	X(201, "Created") \
 	X(202, "Accepted") \
 	X(204, "No Content") \
+	X(206, "Partial Content") \
 	X(301, "Moved Permanently") \
 	X(302, "Found") \
 	X(303, "See Other") \
@@ -37,6 +38,7 @@ enum wuy_http_method {
 	X(405, "Method Not Allowed") \
 	X(406, "Not Acceptable") \
 	X(408, "Request Timeout") \
+	X(416, "Range Not Satisfiable") \
 	X(500, "Internal Server Error") \
 	X(502, "Bad Gateway") \
 	X(503, "Service Unavailable") \
@@ -131,5 +133,13 @@ bool wuy_http_chunked_is_finished(const wuy_http_chunked_t *chunked);
 #define WUY_HTTP_DATE_LENGTH (sizeof("Tue, 12 Jan 2010 13:48:00 GMT") - 1)
 time_t wuy_http_date_parse(const char *str);
 const char *wuy_http_date_make(time_t ts);
+
+struct wuy_http_range {
+	off_t	first;
+	off_t	last;
+};
+
+int wuy_http_range_parse(const char *value_str, int value_len, off_t total_size,
+		struct wuy_http_range *ranges, int range_num);
 
 #endif

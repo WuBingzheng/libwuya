@@ -553,3 +553,101 @@ const char *wuy_http_date_make(time_t ts)
 	}
 	return cache;
 }
+
+static off_t wuy_http_range_num(const char *pos, const char *end, const char **stop)
+{
+	off_t n = 0;
+	while (pos < end) {
+		char c = *pos;
+		if (c < '0' || c > '9') {
+			break;
+		}
+		n = n * 10 + c - '0';
+		pos++;
+	}
+	*stop = pos;
+	return n;
+}
+
+/* For multiple ranges, according to RFC7233, overlap ranges are allowed,
+ * and unsatisfiable ranges are ignored if there is at least one satisfiable
+ * range. However we return fail for both case. */
+int wuy_http_range_parse(const char *value_str, int value_len, off_t total_size,
+		struct wuy_http_range *ranges, int range_num)
+{
+	if (value_len <= 6 || memcmp(value_str, "bytes=", 6) != 0) {
+		return 0;
+	}
+
+	const char *stop, *p = value_str + 6;
+	const char *value_end = value_str + value_len;
+	struct wuy_http_range *range = ranges;
+
+	while (p < value_end) {
+		if (range - ranges > range_num) {
+			return -1;
+		}
+		while (p < value_end && *p == ' ') {
+			p++;
+		}
+
+		/* suffix-byte-range-spec */
+		if (*p == '-') {
+			p++;
+			off_t n = wuy_http_range_num(p, value_end, &stop);
+			if (stop == p) {
+				return -1;
+			}
+			if (stop < value_end && *stop != ',') {
+				return -1;
+			}
+			range->first = (n < total_size) ? total_size - n : 0;
+			range->last = total_size - 1;
+
+			range++;
+			p = stop + 1;
+			continue;
+		}
+
+		/* byte-range-spec: first-byte-pos */
+		range->first = wuy_http_range_num(p, value_end, &stop);
+		if (stop == p) {
+			return -1;
+		}
+		if (stop == value_end || *stop != '-') {
+			return -1;
+		}
+		if (range->first >= total_size) {
+			return -1;
+		}
+		if (range > ranges && range->first <= (range-1)->last) {
+			return -1;
+		}
+		p = stop + 1;
+
+		/* byte-range-spec: last-byte-pos */
+		if (p == value_end || *p == ',') {
+			range->last = total_size - 1;
+			p++;
+			continue;
+		}
+
+		range->last = wuy_http_range_num(p, value_end, &stop);
+		if (stop == p) {
+			return -1;
+		}
+		if (stop < value_end && *stop != ',') {
+			return -1;
+		}
+		if (range->last < range->first) {
+			return -1;
+		}
+		if (range->last >= total_size) {
+			range->last = total_size - 1;
+		}
+		p = stop + 1;
+		range++;
+	}
+
+	return range - ranges;
+}
