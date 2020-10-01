@@ -94,6 +94,45 @@ static size_t wuy_cflua_type_size(enum wuy_cflua_type type)
 	}
 }
 
+static int wuy_cflua_valid_command(lua_State *L, struct wuy_cflua_table *table)
+{
+	struct wuy_cflua_command *cmd;
+
+	switch (lua_type(L, -2)) {
+	case LUA_TNUMBER:
+		for (cmd = table->commands; cmd->type != WUY_CFLUA_TYPE_END; cmd++) {
+			if (cmd->name == NULL) {
+				return 0;
+			}
+		}
+		return WUY_CFLUA_ERR_NO_ARRAY;
+	case LUA_TSTRING:;
+		const char *name = lua_tostring(L, -2);
+		if (name[0] == '_') {
+			return 0;
+		}
+		for (cmd = table->commands; cmd->type != WUY_CFLUA_TYPE_END; cmd++) {
+			if (cmd->name != NULL && strcmp(cmd->name, name) == 0) {
+				return 0;
+			}
+		}
+		if (cmd->u.next != NULL) {
+			struct wuy_cflua_command *(*next)(struct wuy_cflua_command *) = cmd->u.next;
+			while ((cmd = next(cmd)) != NULL) {
+				if (strcmp(cmd->name, name) == 0) {
+					return 0;
+				}
+			}
+		}
+		if (table->arbitrary != NULL) {
+			return table->arbitrary(L) ? 0 : WUY_CFLUA_ERR_ARBITRARY;
+		}
+		return WUY_CFLUA_ERR_INVALID_CMD;
+	default:
+		return WUY_CFLUA_ERR_INVALID_TYPE;
+	}
+}
+
 static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
 	if (lua_isnil(L, -1)) {
@@ -170,10 +209,13 @@ out:
 	return 0;
 }
 
-static int wuy_cflua_set_option(lua_State *L, struct wuy_cflua_command *cmd, void *container)
+static int wuy_cflua_set_option(lua_State *L, struct wuy_cflua_command *cmd, void *container,
+		bool no_default_value)
 {
 	if (lua_isnil(L, -1)) {
-		wuy_cflua_set_default_value(L, cmd, container);
+		if (!no_default_value) {
+			wuy_cflua_set_default_value(L, cmd, container);
+		}
 		if (cmd->meta_level_offset != 0) {
 			WUY_CFLUA_PINT(container, cmd->meta_level_offset) = -1;
 		}
@@ -182,7 +224,9 @@ static int wuy_cflua_set_option(lua_State *L, struct wuy_cflua_command *cmd, voi
 
 	lua_getfield(L, -1, cmd->name);
 	if (lua_isnil(L, -1)) {
-		wuy_cflua_set_default_value(L, cmd, container);
+		if (!no_default_value) {
+			wuy_cflua_set_default_value(L, cmd, container);
+		}
 		if (cmd->meta_level_offset != 0) {
 			WUY_CFLUA_PINT(container, cmd->meta_level_offset) = -1;
 		}
@@ -264,12 +308,25 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 		table->init(container);
 	}
 
+	/* walk through config against table->commands */
+	if (cmd->name == NULL || cmd->name[0] != '_') {
+		lua_pushnil(L);
+		while (lua_next(L, -2) != 0) {
+			int ret = wuy_cflua_valid_command(L, table);
+			if (ret != 0) {
+				// return ret; // TODO
+			}
+			lua_pop(L, 1); /* value */
+		}
+	}
+
+	/* walk through table->commands against config */
 	for (cmd = table->commands; cmd->type != WUY_CFLUA_TYPE_END; cmd++) {
 		int ret;
 		if (cmd->name == NULL) {
 			ret = wuy_cflua_set_array_members(L, cmd, container);
 		} else {
-			ret = wuy_cflua_set_option(L, cmd, container);
+			ret = wuy_cflua_set_option(L, cmd, container, table->no_default_value);
 		}
 		if (ret != 0) {
 			return ret;
@@ -278,7 +335,7 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 	if (cmd->u.next != NULL) {
 		struct wuy_cflua_command *(*next)(struct wuy_cflua_command *) = cmd->u.next;
 		while ((cmd = next(cmd)) != NULL) {
-			int ret = wuy_cflua_set_option(L, cmd, container);
+			int ret = wuy_cflua_set_option(L, cmd, container, table->no_default_value);
 			if (ret != 0) {
 				return ret;
 			}
@@ -366,9 +423,13 @@ static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *
 	}
 }
 
-int wuy_cflua_parse(lua_State *L, struct wuy_cflua_command *cmd, void *container)
+int wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table, void *container)
 {
-	return wuy_cflua_set_table(L, cmd, container);
+	struct wuy_cflua_command tmp = {
+		.type = WUY_CFLUA_TYPE_TABLE,
+		.u.table = table,
+	};
+	return wuy_cflua_set_table(L, &tmp, container);
 }
 
 static const char *wuy_cflua_strtype(enum wuy_cflua_type type)
@@ -429,6 +490,18 @@ const char *wuy_cflua_strerror(lua_State *L, int err)
 				p += sprintf(p, "(-, %g]", limits->upper);
 			}
 		}
+		break;
+	case WUY_CFLUA_ERR_NO_ARRAY:
+		p += sprintf(p, "array member is not allowed");
+		break;
+	case WUY_CFLUA_ERR_INVALID_TYPE:
+		p += sprintf(p, "invalid command key type: %s", lua_typename(L, lua_type(L, -2)));
+		break;
+	case WUY_CFLUA_ERR_INVALID_CMD:
+		p += sprintf(p, "invalid command: %s", lua_tostring(L, -2));
+		break;
+	case WUY_CFLUA_ERR_ARBITRARY:
+		p += sprintf(p, "arbitrary fail for %s", lua_tostring(L, -2));
 		break;
 	default:
 		p += sprintf(p, "!!! impossible error code: %d", err);

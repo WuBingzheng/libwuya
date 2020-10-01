@@ -11,6 +11,10 @@
 #define WUY_CFLUA_ERR_TOO_DEEP_META	-4
 #define WUY_CFLUA_ERR_WRONG_TYPE	-5
 #define WUY_CFLUA_ERR_LIMIT		-6
+#define WUY_CFLUA_ERR_NO_ARRAY		-7
+#define WUY_CFLUA_ERR_INVALID_TYPE	-8
+#define WUY_CFLUA_ERR_INVALID_CMD	-9
+#define WUY_CFLUA_ERR_ARBITRARY		-10
 
 /* `type` in `struct wuy_cflua_command` */
 enum wuy_cflua_type {
@@ -109,6 +113,8 @@ struct wuy_cflua_table {
 	 * If set 0, do not allocate new container and use the current container. */
 	unsigned		size;
 
+	bool			no_default_value;
+
 	/* print the table's name, for wuy_cflua_strerror() to print table-stack.
 	 * If this is not set and command->name is set (not array member command),
 	 * command->name is used. Otherwise "{?}" is used. */
@@ -119,10 +125,13 @@ struct wuy_cflua_table {
 
 	/* handler called after parsing */
 	bool			(*post)(void *);
+
+	/* handler for arbitrary key-value options */
+	bool			(*arbitrary)(lua_State *);
 };
 
 /* parse */
-int wuy_cflua_parse(lua_State *L, struct wuy_cflua_command *cmd, void *container);
+int wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table, void *container);
 
 /* param err  is returned by wuy_cflua_parse(). */
 const char *wuy_cflua_strerror(lua_State *L, int err);
