@@ -157,7 +157,7 @@ static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *c
 	/* OK, now let's read the array members */
 
 	/* unique-member, just assign the single value */
-	if (cmd->flags & WUY_CFLUA_FLAG_UNIQ_MEMBER) {
+	if (cmd->is_single_array) {
 		if (objlen != 1) {
 			return WUY_CFLUA_ERR_DEPLICATE_MEMBER;
 		}

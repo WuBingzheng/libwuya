@@ -30,32 +30,16 @@ enum wuy_cflua_type {
 /* for WUY_CFLUA_TYPE_FUNCTION */
 typedef int wuy_cflua_function_t;
 
-/* `flags` in `struct wuy_cflua_command` */
-enum wuy_cflua_flag {
-	/* only for WUY_CFLUA_TYPE_TABLE, reuse table with the same address */
-	WUY_CFLUA_FLAG_TABLE_REUSE = 0x1,
-
-	/* only for WUY_CFLUA_TYPE_TABLE, allow arbitrary key */
-	WUY_CFLUA_FLAG_ARBITRARY_KEY = 0x2,
-
-	/* only for array member commands.
-	 * If set, at most 1 member is allowed, and assigned to container directly.
-	 * If not set, more members are allowed, and an array is allocated to
-	 * save the members, and the array is assigned to container. The array size
-	 * is (#member+1) where the last one is zero-value. Set @array_number_offset
-	 * to get #member. */
-	WUY_CFLUA_FLAG_UNIQ_MEMBER = 0x4,
-};
-
 struct wuy_cflua_table;
 struct wuy_cflua_command {
 	/* name of command.
 	 * NULL for array member command, and non-NULL for key-value options. */
 	const char		*name;
 
-	enum wuy_cflua_type	type;
+	/* is single array member? */
+	bool			is_single_array;
 
-	enum wuy_cflua_flag	flags;
+	enum wuy_cflua_type	type;
 
 	/* offset of target member in container. */
 	off_t			offset;
