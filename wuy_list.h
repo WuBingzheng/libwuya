@@ -146,11 +146,13 @@ static inline void wuy_list_del_init(wuy_list_node_t *node)
 /**
  * @brief Delete node if linked.
  */
-static inline void wuy_list_del_if(wuy_list_node_t *node)
+static inline bool wuy_list_del_if(wuy_list_node_t *node)
 {
 	if (node->prev != NULL) {
 		_list_del(node->prev, node->next);
+		return true;
 	}
+	return false;
 }
 
 /**
@@ -168,6 +170,14 @@ static inline bool wuy_list_empty(const wuy_list_t *list)
 static inline bool wuy_list_node_linked(const wuy_list_node_t *node)
 {
 	return node->next != NULL;
+}
+
+/**
+ * @brief Return if the list is inited.
+ */
+static inline bool wuy_list_inited(const wuy_list_t *list)
+{
+	return wuy_list_node_linked(&list->head);
 }
 
 /**
