@@ -45,21 +45,15 @@ static int wuy_cflua_set_boolean(lua_State *L, struct wuy_cflua_command *cmd, vo
 }
 static int wuy_cflua_set_integer(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
-	/* we assume that lua_Number is double */
-	lua_Number value = lua_tonumber(L, -1);
-	int n = (int)value;
-	if (value != (lua_Number)n) {
-		return WUY_CFLUA_ERR_WRONG_TYPE;
-	}
-
-	if (cmd->limits.n.is_lower && n < cmd->limits.n.lower) {
+	int value = lua_tointeger(L, -1);
+	if (cmd->limits.n.is_lower && value < cmd->limits.n.lower) {
 		return WUY_CFLUA_ERR_LIMIT;
 	}
-	if (cmd->limits.n.is_upper && n > cmd->limits.n.upper) {
+	if (cmd->limits.n.is_upper && value > cmd->limits.n.upper) {
 		return WUY_CFLUA_ERR_LIMIT;
 	}
 
-	wuy_cflua_assign_value(cmd, container, n);
+	wuy_cflua_assign_value(cmd, container, value);
 	return 0;
 }
 static int wuy_cflua_set_double(lua_State *L, struct wuy_cflua_command *cmd, void *container)
