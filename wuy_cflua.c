@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
 #include <lua5.1/lua.h>
 #include <lua5.1/lauxlib.h>
 
@@ -203,13 +204,10 @@ out:
 	return 0;
 }
 
-static int wuy_cflua_set_option(lua_State *L, struct wuy_cflua_command *cmd, void *container,
-		bool no_default_value)
+static int wuy_cflua_set_option(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
 	if (lua_isnil(L, -1)) {
-		if (!no_default_value) {
-			wuy_cflua_set_default_value(L, cmd, container);
-		}
+		wuy_cflua_set_default_value(L, cmd, container);
 		if (cmd->meta_level_offset != 0) {
 			WUY_CFLUA_PINT(container, cmd->meta_level_offset) = -1;
 		}
@@ -218,9 +216,7 @@ static int wuy_cflua_set_option(lua_State *L, struct wuy_cflua_command *cmd, voi
 
 	lua_getfield(L, -1, cmd->name);
 	if (lua_isnil(L, -1)) {
-		if (!no_default_value) {
-			wuy_cflua_set_default_value(L, cmd, container);
-		}
+		wuy_cflua_set_default_value(L, cmd, container);
 		if (cmd->meta_level_offset != 0) {
 			WUY_CFLUA_PINT(container, cmd->meta_level_offset) = -1;
 		}
@@ -320,7 +316,7 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 		if (cmd->name == NULL) {
 			ret = wuy_cflua_set_array_members(L, cmd, container);
 		} else {
-			ret = wuy_cflua_set_option(L, cmd, container, table->no_default_value);
+			ret = wuy_cflua_set_option(L, cmd, container);
 		}
 		if (ret != 0) {
 			return ret;
@@ -329,7 +325,7 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 	if (cmd->u.next != NULL) {
 		struct wuy_cflua_command *(*next)(struct wuy_cflua_command *) = cmd->u.next;
 		while ((cmd = next(cmd)) != NULL) {
-			int ret = wuy_cflua_set_option(L, cmd, container, table->no_default_value);
+			int ret = wuy_cflua_set_option(L, cmd, container);
 			if (ret != 0) {
 				return ret;
 			}
@@ -551,4 +547,67 @@ void wuy_cflua_build_tables(lua_State *L, struct wuy_cflua_table *table)
 			lua_setfield(L, -2, cmd->name);
 		}
 	}
+}
+
+static void wuy_cflua_copy_cmd_default(struct wuy_cflua_command *dcmd,
+		const struct wuy_cflua_command *scmd, const void *default_container)
+{
+	*dcmd = *scmd;
+
+	const char *def = (char *)default_container + scmd->offset;
+	if (scmd->type != WUY_CFLUA_TYPE_TABLE) {
+		memcpy(&dcmd->default_value, def, wuy_cflua_type_size(scmd->type));
+	} else if (scmd->u.table->size == 0) {
+		dcmd->u.table = wuy_cflua_copy_table_default(scmd->u.table, def);
+	} else if (*(const void **)def != NULL) {
+		dcmd->u.table = wuy_cflua_copy_table_default(scmd->u.table, *(const void **)def);
+	} else {
+		dcmd->real = (void *)1;
+	}
+}
+struct wuy_cflua_table *wuy_cflua_copy_table_default(const struct wuy_cflua_table *src,
+		const void *default_container)
+{
+	struct wuy_cflua_table *dest = malloc(sizeof(struct wuy_cflua_table));
+	*dest = *src;
+
+	int cmd_num = 0;
+	struct wuy_cflua_command *scmd;
+	for (scmd = src->commands; scmd->type != WUY_CFLUA_TYPE_END; scmd++) {
+		cmd_num++;
+	}
+	if (scmd->u.next != NULL) {
+		struct wuy_cflua_command *(*next)(struct wuy_cflua_command *) = scmd->u.next;
+		while ((scmd = next(scmd)) != NULL) {
+			cmd_num++;
+		}
+	}
+
+	dest->commands = calloc(cmd_num + 1, sizeof(struct wuy_cflua_command));
+	struct wuy_cflua_command *dcmd;
+	for (scmd = src->commands, dcmd = dest->commands; scmd->type != WUY_CFLUA_TYPE_END; scmd++, dcmd++) {
+		wuy_cflua_copy_cmd_default(dcmd, scmd, default_container);
+	}
+	if (scmd->u.next != NULL) {
+		struct wuy_cflua_command *(*next)(struct wuy_cflua_command *) = scmd->u.next;
+		while ((scmd = next(scmd)) != NULL) {
+			wuy_cflua_copy_cmd_default(dcmd, scmd, default_container);
+			dcmd++;
+		}
+	}
+	dcmd->type = WUY_CFLUA_TYPE_END;
+
+	return dest;
+}
+void wuy_cflua_free_copied_table(struct wuy_cflua_table *table)
+{
+	struct wuy_cflua_command *cmd;
+	for (cmd = table->commands; cmd->type != WUY_CFLUA_TYPE_END; cmd++) {
+		if (cmd->type == WUY_CFLUA_TYPE_TABLE && cmd->real == NULL) {
+			wuy_cflua_free_copied_table(cmd->u.table);
+		}
+	}
+	assert(cmd->u.next == NULL);
+	free(table->commands);
+	free(table);
 }

@@ -97,8 +97,6 @@ struct wuy_cflua_table {
 	 * If set 0, do not allocate new container and use the current container. */
 	unsigned		size;
 
-	bool			no_default_value;
-
 	/* print the table's name, for wuy_cflua_strerror() to print table-stack.
 	 * If this is not set and command->name is set (not array member command),
 	 * command->name is used. Otherwise "{?}" is used. */
@@ -119,6 +117,10 @@ int wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table, void *container
 
 /* param err  is returned by wuy_cflua_parse(). */
 const char *wuy_cflua_strerror(lua_State *L, int err);
+
+struct wuy_cflua_table *wuy_cflua_copy_table_default(const struct wuy_cflua_table *src,
+		const void *default_container);
+void wuy_cflua_free_copied_table(struct wuy_cflua_table *table);
 
 static inline bool wuy_cflua_is_function_set(wuy_cflua_function_t f)
 {
