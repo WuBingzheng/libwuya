@@ -382,10 +382,6 @@ static int wuy_cflua_set_types(lua_State *L, struct wuy_cflua_command *cmd, void
 
 static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
-	if (cmd->default_value.s == NULL) {
-		return;
-	}
-
 	switch (cmd->type) {
 	case WUY_CFLUA_TYPE_BOOLEAN:
 		wuy_cflua_assign_value(cmd, container, cmd->default_value.b);
@@ -398,7 +394,7 @@ static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *
 		return;
 	case WUY_CFLUA_TYPE_STRING:
 		wuy_cflua_assign_value(cmd, container, cmd->default_value.s);
-		if (cmd->u.length_offset != 0) {
+		if (cmd->u.length_offset != 0 && cmd->default_value.s != NULL) {
 			WUY_CFLUA_PINT(container, cmd->u.length_offset) = strlen(cmd->default_value.s);
 		}
 		return;
@@ -406,7 +402,9 @@ static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *
 		wuy_cflua_assign_value(cmd, container, cmd->default_value.f);
 		return;
 	case WUY_CFLUA_TYPE_TABLE:
+		lua_newtable(L);
 		wuy_cflua_set_table(L, cmd, container);
+		lua_pop(L, 1);
 		return;
 	default:
 		abort();
@@ -554,7 +552,7 @@ static void wuy_cflua_copy_cmd_default(struct wuy_cflua_command *dcmd,
 {
 	*dcmd = *scmd;
 
-	const char *def = (char *)default_container + scmd->offset;
+	const char *def = (const char *)default_container + scmd->offset;
 	if (scmd->type != WUY_CFLUA_TYPE_TABLE) {
 		memcpy(&dcmd->default_value, def, wuy_cflua_type_size(scmd->type));
 	} else if (scmd->u.table->size == 0) {
