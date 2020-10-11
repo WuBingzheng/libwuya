@@ -107,8 +107,15 @@ static int wuy_cflua_valid_command(lua_State *L, struct wuy_cflua_table *table)
 			return 0;
 		}
 		for (cmd = table->commands; cmd->type != WUY_CFLUA_TYPE_END; cmd++) {
-			if (cmd->name != NULL && strcmp(cmd->name, name) == 0) {
-				return 0;
+			if (cmd->name != NULL) {
+				if (strcmp(cmd->name, name) == 0) {
+					return 0;
+				}
+			} else if (cmd->is_extra_commands) {
+				assert(cmd->type == WUY_CFLUA_TYPE_TABLE);
+				if (wuy_cflua_valid_command(L, cmd->u.table) == 0) {
+					return 0;
+				}
 			}
 		}
 		if (cmd->u.next != NULL) {
@@ -304,7 +311,7 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 		while (lua_next(L, -2) != 0) {
 			int ret = wuy_cflua_valid_command(L, table);
 			if (ret != 0) {
-				// return ret; // TODO
+				return ret;
 			}
 			lua_pop(L, 1); /* value */
 		}
@@ -506,7 +513,7 @@ const char *wuy_cflua_strerror(lua_State *L, int err)
 		} else if (cmd->name != NULL) {
 			p += snprintf(p, end - p, "%s>", cmd->name);
 		} else {
-			p += snprintf(p, end - p, "{?}>");
+			p += snprintf(p, end - p, "[ARRAY]>");
 		}
 	}
 

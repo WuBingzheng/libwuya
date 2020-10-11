@@ -39,6 +39,8 @@ struct wuy_cflua_command {
 	/* is single array member? */
 	bool			is_single_array;
 
+	bool			is_extra_commands;
+
 	enum wuy_cflua_type	type;
 
 	/* offset of target member in container. */
