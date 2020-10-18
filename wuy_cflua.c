@@ -265,11 +265,8 @@ static int wuy_cflua_set_option(lua_State *L, struct wuy_cflua_command *cmd, voi
 
 static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
-	wuy_cflua_stacks[wuy_cflua_stack_index].cmd = cmd->real ? cmd->real : cmd;
-	wuy_cflua_stacks[wuy_cflua_stack_index].container = (char *)container + cmd->offset;
-	wuy_cflua_stack_index++;
-
 	struct wuy_cflua_table *table = cmd->u.table;
+	const char *name = cmd->name;
 
 	if (table->size == 0) { /* use this container with offset */
 		container = (char *)container + cmd->offset;
@@ -301,20 +298,12 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 		lua_settable(L, LUA_REGISTRYINDEX);
 	}
 
+	wuy_cflua_stacks[wuy_cflua_stack_index].cmd = cmd->real ? cmd->real : cmd;
+	wuy_cflua_stacks[wuy_cflua_stack_index].container = container;
+	wuy_cflua_stack_index++;
+
 	if (table->init != NULL) {
 		table->init(container);
-	}
-
-	/* walk through config against table->commands */
-	if (cmd->name == NULL || cmd->name[0] != '_') {
-		lua_pushnil(L);
-		while (lua_next(L, -2) != 0) {
-			int ret = wuy_cflua_valid_command(L, table);
-			if (ret != 0) {
-				return ret;
-			}
-			lua_pop(L, 1); /* value */
-		}
 	}
 
 	/* walk through table->commands against config */
@@ -336,6 +325,18 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 			if (ret != 0) {
 				return ret;
 			}
+		}
+	}
+
+	/* walk through config against table->commands to validate, only if non-internal */
+	if (name == NULL || name[0] != '_') {
+		lua_pushnil(L);
+		while (lua_next(L, -2) != 0) {
+			int ret = wuy_cflua_valid_command(L, table);
+			if (ret != 0) {
+				return ret;
+			}
+			lua_pop(L, 1); /* value */
 		}
 	}
 
@@ -509,7 +510,7 @@ const char *wuy_cflua_strerror(lua_State *L, int err)
 		struct wuy_cflua_stack *stack = &wuy_cflua_stacks[i];
 		struct wuy_cflua_command *cmd = stack->cmd;
 		if (cmd->u.table->name != NULL) {
-			p += cmd->u.table->name(*(void **)(stack->container), p, end - p);
+			p += cmd->u.table->name(stack->container, p, end - p);
 		} else if (cmd->name != NULL) {
 			p += snprintf(p, end - p, "%s>", cmd->name);
 		} else {
