@@ -138,6 +138,7 @@ static int wuy_cflua_valid_command(lua_State *L, struct wuy_cflua_table *table)
 static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
 	if (lua_isnil(L, -1)) {
+		wuy_cflua_set_default_value(L, cmd, container);
 		return 0;
 	}
 
@@ -146,6 +147,7 @@ static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *c
 	int meta_level = 0;
 	while ((objlen = lua_objlen(L, -1)) == 0) {
 		if (!lua_getmetatable(L, -1)) {
+			wuy_cflua_set_default_value(L, cmd, container);
 			lua_pop(L, meta_level);
 			return 0;
 		}
@@ -215,19 +217,12 @@ static int wuy_cflua_set_option(lua_State *L, struct wuy_cflua_command *cmd, voi
 {
 	if (lua_isnil(L, -1)) {
 		wuy_cflua_set_default_value(L, cmd, container);
-		if (cmd->meta_level_offset != 0) {
-			WUY_CFLUA_PINT(container, cmd->meta_level_offset) = -1;
-		}
 		return 0;
 	}
 
 	lua_getfield(L, -1, cmd->name);
 	if (lua_isnil(L, -1)) {
 		wuy_cflua_set_default_value(L, cmd, container);
-		if (cmd->meta_level_offset != 0) {
-			WUY_CFLUA_PINT(container, cmd->meta_level_offset) = -1;
-		}
-
 		lua_pop(L, 1);
 		return 0;
 	}
@@ -390,6 +385,15 @@ static int wuy_cflua_set_types(lua_State *L, struct wuy_cflua_command *cmd, void
 
 static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
+	if (cmd->meta_level_offset != 0) {
+		WUY_CFLUA_PINT(container, cmd->meta_level_offset) = -1;
+	}
+
+	if (cmd->name == NULL && !cmd->is_single_array) {
+		wuy_cflua_assign_value(cmd, container, cmd->default_value.p);
+		return;
+	}
+
 	switch (cmd->type) {
 	case WUY_CFLUA_TYPE_BOOLEAN:
 		wuy_cflua_assign_value(cmd, container, cmd->default_value.b);
