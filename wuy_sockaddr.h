@@ -35,14 +35,15 @@
  *
  * @return true on success, and false on fail.
  */
-bool wuy_sockaddr_pton(const char *str, struct sockaddr *out, unsigned short default_port);
+bool wuy_sockaddr_loads(const char *str, struct sockaddr_storage *out,
+		unsigned short default_port);
 
 /**
- * @brief convert address (ip + port) from struct sockaddr into string.
+ * @brief convert address (ip + port) from struct sockaddr_storage into string.
  *
  * @return -1 on fail, or the length of string, excluding the null byte.
  */
-int wuy_sockaddr_ntop(const struct sockaddr *sa, char *buf, int size);
+int wuy_sockaddr_dumps(const struct sockaddr *sa, char *buf, int size);
 
 /**
  * @brief return size of address by sa->sa_family.

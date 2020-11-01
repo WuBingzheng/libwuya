@@ -18,8 +18,7 @@
 static bool wuy_port_pton(const char *str, unsigned short *pport)
 {
 	unsigned n = 0;
-	const char *p = str;
-	while (*p) {
+	for (const char *p = str; *p != '\0'; p++) {
 		if (*p < '0' || *p > '9') {
 			return false;
 		}
@@ -27,7 +26,6 @@ static bool wuy_port_pton(const char *str, unsigned short *pport)
 		if (n > 65535) {
 			return false;
 		}
-		p++;
 	}
 	if (n == 0) {
 		return false;
@@ -92,8 +90,8 @@ static bool wuy_sockaddr_pton_ipv6(const char *str, struct sockaddr_in6 *out,
 	/* ip */
 	if (ip_end != str + 1) {
 		char tmpbuf[ip_end - str + 1];
-		memcpy(tmpbuf, str, ip_end - str);
-		tmpbuf[ip_end - str] = '\0';
+		memcpy(tmpbuf, str + 1, ip_end - str - 1);
+		tmpbuf[ip_end - str - 1] = '\0';
 		if (!inet_pton(AF_INET6, tmpbuf, &(out->sin6_addr))) {
 			return false;
 		}
@@ -114,44 +112,58 @@ static bool wuy_sockaddr_pton_ipv6(const char *str, struct sockaddr_in6 *out,
 	return true;
 }
 
-bool wuy_sockaddr_pton(const char *str, struct sockaddr *out, unsigned short default_port)
+bool wuy_sockaddr_loads(const char *str, struct sockaddr_storage *out,
+		unsigned short default_port)
 {
-	return (str[0] == '[')
-		? wuy_sockaddr_pton_ipv6(str, (struct sockaddr_in6 *)out, default_port)
-		: wuy_sockaddr_pton_ipv4(str, (struct sockaddr_in *)out, default_port);
+	/* Unix Domain */
+	if (memcmp(str, "unix:", 5) == 0) {
+		struct sockaddr_un *sun = (struct sockaddr_un *)out;
+		out->ss_family = AF_UNIX;
+		strncpy(sun->sun_path, str + 5, sizeof(sun->sun_path));
+		return sun->sun_path[sizeof(sun->sun_path) - 1] == '\0';
+	}
+
+	/* IPv4 and IPv6 */
+	if (str[0] == '[') {
+		return wuy_sockaddr_pton_ipv6(str, (struct sockaddr_in6 *)out, default_port);
+	} else {
+		return wuy_sockaddr_pton_ipv4(str, (struct sockaddr_in *)out, default_port);
+	}
 }
 
-int wuy_sockaddr_ntop(const struct sockaddr *sa, char *buf, int size)
+int wuy_sockaddr_dumps(const struct sockaddr *sa, char *buf, int size)
 {
-	unsigned short port;
-	int len;
-	if (sa->sa_family == AF_INET) {
+	switch (sa->sa_family) {
+	case AF_INET: {
 		struct sockaddr_in *sain = (struct sockaddr_in *)sa;
 		if (inet_ntop(AF_INET, &sain->sin_addr, buf, size) == NULL) {
 			return -1;
 		}
-		len = strlen(buf);
-		port = sain->sin_port;
-
-	} else if (sa->sa_family == AF_INET6) {
+		int len = strlen(buf);
+		len += snprintf(buf + len, size - len, ":%d", ntohs(sain->sin_port));
+		return len;
+	}
+	case AF_INET6: {
 		struct sockaddr_in6 *sain6 = (struct sockaddr_in6 *)sa;
 		buf[0] = '[';
 		if (inet_ntop(AF_INET6, &sain6->sin6_addr, buf + 1, size - 2) == NULL) {
 			return -1;
 		}
-		len = strlen(buf);
-		port = sain6->sin6_port;
-		buf[len++] = ']';
-		buf[len] = '\0';
-
-	} else {
-		return -2;
+		int len = strlen(buf);
+		len += snprintf(buf + len, size - len, "]:%d", ntohs(sain6->sin6_port));
+		return len;
 	}
+	case AF_UNIX: {
+		const struct sockaddr_un *sun = (const struct sockaddr_un *)sa;
+		memcpy(buf, "unix:", 5);
+		strncpy(buf + 5, sun->sun_path, size - 5);
+		return strlen(buf);
 
-	if (port != 0) {
-		len += snprintf(buf + len, size - len, ":%d", ntohs(port));
 	}
-	return len;
+	default:
+		abort();
+		return 0;
+	}
 }
 
 size_t wuy_sockaddr_size(const struct sockaddr *sa)
@@ -162,7 +174,7 @@ size_t wuy_sockaddr_size(const struct sockaddr *sa)
 	case AF_INET6:
 		return sizeof(struct sockaddr_in6);
 	case AF_UNIX:
-		return sizeof(struct sockaddr_un);
+		return sizeof(sa->sa_family) + strlen(((const struct sockaddr_un *)sa)->sun_path) + 1;
 	default:
 		abort();
 	}

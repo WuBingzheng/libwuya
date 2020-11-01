@@ -27,6 +27,8 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#include "wuy_sockaddr.h"
+
 
 /**
  * @brief Set sndbuf.
@@ -99,7 +101,7 @@ static inline int wuy_tcp_listen(struct sockaddr *sa, int backlog, bool reuse_po
 		return -1;
 	}
 
-	if (bind(fd, sa, sizeof(struct sockaddr)) < 0) {
+	if (bind(fd, sa, wuy_sockaddr_size(sa)) < 0) {
 		close(fd);
 		return -1;
 	}
@@ -111,10 +113,10 @@ static inline int wuy_tcp_listen(struct sockaddr *sa, int backlog, bool reuse_po
 /**
  * @brief Accept new connections.
  */
-static inline int wuy_tcp_accept(int listen_fd, struct sockaddr *client_addr)
+static inline int wuy_tcp_accept(int listen_fd, struct sockaddr_storage *client_addr)
 {
-	socklen_t addrlen = sizeof(struct sockaddr);
-	return accept4(listen_fd, client_addr, &addrlen, SOCK_NONBLOCK);
+	socklen_t addrlen = sizeof(struct sockaddr_storage);
+	return accept4(listen_fd, (struct sockaddr *)client_addr, &addrlen, SOCK_NONBLOCK);
 }
 
 /**
