@@ -1,35 +1,51 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 #include <pthread.h>
 #include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
-#include "wuy_hlist.h"
+#include "wuy_list.h"
+
 #include "wuy_shmpool.h"
 
 #define WUY_SHMPOOL_PAGE_SIZE	4096
 #define WUY_SHMPOOL_NHASH	1024
-#define WUY_SHMPOOL_MAX		10000
-#define WUY_SHMPOOL_SIZE	64*1024
 
-//#define _debug printf
-#define _debug(...)
+#define _debug printf
+//#define _debug(...)
 
-struct wuy_shmpool {
-	uint64_t		key;
-	int			refs;
-	wuy_hlist_node_t	hash_node;
-	char			buffer[WUY_SHMPOOL_SIZE];
+struct wuy_shmpool_shared {
+	char		name[100];
+	size_t		big_size;
+	int		big_max;
+	int		big_index;
+	size_t		small_size;
+	size_t		small_pos;
+	char		small_buffer[0];
 };
 
-/* on shared-memory */
-static pthread_mutex_t *wuy_shmpool_lock;
-static struct wuy_shmpool *wuy_shmpools;
-static wuy_hlist_head_t *wuy_shmpool_hash_buckets;
-static struct wuy_shmpool *wuy_shmpool_current = NULL;
+struct wuy_shmpool_map_info {
+	void		*address;
+	size_t		length;
+};
+struct wuy_shmpool_local {
+	struct wuy_shmpool_shared	*shared_pool;
+	int				big_index;
+	size_t				small_pos;
+	wuy_list_node_t			list_node;
+	struct wuy_shmpool_map_info	map_infos[0];
+};
 
-/* on process local memory */
-static char *wuy_shmpool_current_pos = NULL;
+static pthread_mutex_t *wuy_shmpool_lock;
+
+static WUY_LIST(wuy_shmpool_local_head);
+static struct wuy_shmpool_local *wuy_shmpool_current;
 
 static void *wuy_shmpool_alloc_permanent(size_t size)
 {
@@ -50,100 +66,124 @@ static void *wuy_shmpool_alloc_permanent(size_t size)
 	return ret;
 }
 
-void wuy_shmpool_init(void)
+static void *wuy_shmpool_open_mmap(const char *name, size_t size)
 {
-	wuy_shmpool_hash_buckets = wuy_shmpool_alloc_permanent(
-			sizeof(wuy_hlist_head_t) * WUY_SHMPOOL_NHASH);
+	_debug("wuy_shmpool: open mmap %s %lu\n", name, size);
 
-	wuy_shmpools = wuy_shmpool_alloc_permanent(
-			sizeof(struct wuy_shmpool) * WUY_SHMPOOL_MAX);
-
-	wuy_shmpool_lock = wuy_shmpool_alloc_permanent(sizeof(pthread_mutex_t));
-
-	pthread_mutexattr_t attr;
-	pthread_mutexattr_init(&attr);
-	pthread_mutexattr_setpshared(&attr, 1);
-	pthread_mutex_init(wuy_shmpool_lock, &attr);
-	pthread_mutexattr_destroy(&attr);
-}
-
-static struct wuy_shmpool *wuy_shmpool_hash_get(uint64_t key)
-{
-	wuy_hlist_head_t *bucket = &wuy_shmpool_hash_buckets[key % WUY_SHMPOOL_NHASH];
-
-	struct wuy_shmpool *pool;
-	wuy_hlist_iter_type(bucket, pool, hash_node) {
-		if (pool->key == key) {
-			return pool;
-		}
-	}
-	return NULL;
-}
-
-static void wuy_shmpool_hash_add(struct wuy_shmpool *pool)
-{
-	wuy_hlist_head_t *bucket = &wuy_shmpool_hash_buckets[pool->key % WUY_SHMPOOL_NHASH];
-	wuy_hlist_insert(bucket, &pool->hash_node);
-}
-
-struct wuy_shmpool *wuy_shmpool_new(uint64_t key)
-{
-	pthread_mutex_lock(wuy_shmpool_lock);
-
-	struct wuy_shmpool *pool = wuy_shmpool_hash_get(key);
-	if (pool == NULL) {
-		for (int i = 0; i < WUY_SHMPOOL_MAX; i++) {
-			if (wuy_shmpools[i].refs == 0) {
-				_debug("wuy_shmpool: create new pool\n");
-				pool = &wuy_shmpools[i];
-				break;
-			}
-		}
-		if (pool == NULL) {
-			_debug("wuy_shmpool: fail to create new pool key=%lx\n", key);
-			pthread_mutex_unlock(wuy_shmpool_lock);
-			return false;
-		}
-		pool->key = key;
-		wuy_shmpool_hash_add(pool);
+	int fd = shm_open(name, O_RDWR | O_CREAT, 0600);
+	if (fd < 0) {
+		return NULL;
 	}
 
-	_debug("wuy_shmpool: new pool key=%lx, i=%ld, refs=%d\n",
-			key, pool - wuy_shmpools, pool->refs);
+	struct stat buf;
+	fstat(fd, &buf);
+	if (buf.st_size == 0) {
+		ftruncate(fd, size);
+	} else if (buf.st_size != size) {
+		printf("wuy_shmpool: fail in size: %ld %ld\n", size, buf.st_size);
+		return NULL;
+	}
 
-	pool->refs++;
-	wuy_shmpool_current = pool;
-	wuy_shmpool_current_pos = pool->buffer;
+	void *ret = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	if (ret == NULL) {
+		_debug("wuy_shmpool: open mmap fail %s %lu\n", name, size);
+	}
 
-	pthread_mutex_unlock(wuy_shmpool_lock);
-	return pool;
+	close(fd);
+	return ret;
 }
 
-void wuy_shmpool_release(struct wuy_shmpool *pool)
+struct wuy_shmpool_local *wuy_shmpool_new(const char *name, size_t small_size,
+		size_t big_size, int big_max)
 {
+	_debug("wuy_shmpool: new pool name=%s\n", name);
+
+	/* shared */
 	pthread_mutex_lock(wuy_shmpool_lock);
 
-	_debug("wuy_shmpool: release pool %lx\n", pool->key);
+	struct wuy_shmpool_shared *shared_pool = wuy_shmpool_open_mmap(name, sizeof(struct wuy_shmpool_shared) + small_size);
 
-	if (--pool->refs == 0) {
-		pool->key = 0;
-		wuy_hlist_delete(&pool->hash_node);
+	if (shared_pool->name[0] == '\0') {
+		strncpy(shared_pool->name, name, sizeof(shared_pool->name));
+		shared_pool->small_size = small_size;
+		shared_pool->big_size = big_size;
+		shared_pool->big_max = big_max;
+
+	} else if (strcmp(shared_pool->name, name) != 0) {
+		printf("wuy_shmpool: fail in match!!!\n");
+		pthread_mutex_unlock(wuy_shmpool_lock);
+		return NULL;
 	}
 
 	pthread_mutex_unlock(wuy_shmpool_lock);
+
+	/* local */
+	struct wuy_shmpool_local *local_pool = calloc(1, sizeof(struct wuy_shmpool_local)
+			+ sizeof(struct wuy_shmpool_map_info) * big_max);
+	local_pool->shared_pool = shared_pool;
+	wuy_list_append(&wuy_shmpool_local_head, &local_pool->list_node);
+
+	wuy_shmpool_current = local_pool;
+	return local_pool;
+}
+
+// XXX need lock?
+void wuy_shmpool_release(struct wuy_shmpool_local *local_pool)
+{
+	struct wuy_shmpool_shared *shared_pool = local_pool->shared_pool;
+	const char *name = shared_pool->name;
+
+	_debug("wuy_shmpool: release pool %s\n", name);
+
+	for (int i = 0; i < local_pool->big_index; i++) {
+		char name[1000];
+		sprintf(name, "%s-big-%d", name, i);
+		shm_unlink(name);
+
+		struct wuy_shmpool_map_info *info = &local_pool->map_infos[i];
+		munmap(info->address, info->length);
+	}
+	shm_unlink(name);
+	munmap(shared_pool, sizeof(struct wuy_shmpool_shared) + shared_pool->small_size);
 }
 
 static void *wuy_shmpool_alloc_small(size_t size)
 {
-	if (wuy_shmpool_current->buffer + WUY_SHMPOOL_SIZE - wuy_shmpool_current_pos < size) {
-		_debug("wuy_shmpool: fail in alloc small total=%ld size=%ld\n",
-				wuy_shmpool_current->buffer + WUY_SHMPOOL_SIZE
-				- wuy_shmpool_current_pos, size);
+	struct wuy_shmpool_shared *shared_pool = wuy_shmpool_current->shared_pool;
+
+	if (shared_pool->small_size - wuy_shmpool_current->small_pos < size) {
+		_debug("wuy_shmpool: fail in alloc small total=%lu pos=%lu size=%lu\n",
+				shared_pool->small_size, wuy_shmpool_current->small_pos, size);
 		return NULL;
 	}
 
-	void *ret = wuy_shmpool_current_pos;
-	wuy_shmpool_current_pos += size;
+	void *ret = shared_pool->small_buffer + wuy_shmpool_current->small_pos;
+	wuy_shmpool_current->small_pos += size;
+	return ret;
+}
+
+static void *wuy_shmpool_alloc_big(size_t size)
+{
+	struct wuy_shmpool_shared *shared_pool = wuy_shmpool_current->shared_pool;
+
+	_debug("wuy_shmpool big alloc: %s index=%d size=%lu\n",
+			shared_pool->name, wuy_shmpool_current->big_index, size);
+
+	if (wuy_shmpool_current->big_index >= shared_pool->big_max) {
+		return NULL;
+	}
+
+	int big_index = wuy_shmpool_current->big_index++;
+
+	char name[1000];
+	sprintf(name, "%s-big-%d", shared_pool->name, big_index);
+
+	void *ret = wuy_shmpool_open_mmap(name, size);
+
+	struct wuy_shmpool_map_info *info = &wuy_shmpool_current->map_infos[big_index];
+	info->address = ret;
+	info->length = size;
+
 	return ret;
 }
 
@@ -155,17 +195,55 @@ void *wuy_shmpool_alloc(size_t size)
 		return wuy_shmpool_alloc_permanent(size);
 	}
 
-	return wuy_shmpool_alloc_small(size);
-	/*
-	if (size > WUY_SHMPOOL_PAGE_SIZE) {
+	if (size > wuy_shmpool_current->shared_pool->big_size) {
 		return wuy_shmpool_alloc_big(size);
 	} else {
 		return wuy_shmpool_alloc_small(size);
 	}
-	*/
 }
 
-void wuy_shmpool_finish(struct wuy_shmpool *pool)
+bool wuy_shmpool_finish(struct wuy_shmpool_local *local_pool)
 {
-	wuy_shmpool_current_pos = NULL;
+	struct wuy_shmpool_shared *shared_pool = local_pool->shared_pool;
+
+	pthread_mutex_lock(wuy_shmpool_lock);
+
+	bool check = true;
+
+	if (shared_pool->small_pos == 0) {
+		shared_pool->small_pos = local_pool->small_pos;
+	} else if (shared_pool->small_pos != local_pool->small_pos) {
+		check = false;
+	}
+
+	if (shared_pool->big_index == 0) {
+		shared_pool->big_index = local_pool->big_index;
+	} else if (shared_pool->big_index != local_pool->big_index) {
+		check = false;
+	}
+
+	pthread_mutex_unlock(wuy_shmpool_lock);
+
+	wuy_shmpool_current = NULL;
+	return check;
+}
+
+static void wuy_shmpool_local_exit_handler(void)
+{
+	struct wuy_shmpool_local *local_pool;
+	while (wuy_list_pop_type(&wuy_shmpool_local_head, local_pool, list_node)) {
+		wuy_shmpool_release(local_pool);
+	}
+}
+void wuy_shmpool_init(void)
+{
+	wuy_shmpool_lock = wuy_shmpool_alloc_permanent(sizeof(pthread_mutex_t));
+
+	pthread_mutexattr_t attr;
+	pthread_mutexattr_init(&attr);
+	pthread_mutexattr_setpshared(&attr, 1);
+	pthread_mutex_init(wuy_shmpool_lock, &attr);
+	pthread_mutexattr_destroy(&attr);
+
+	atexit(wuy_shmpool_local_exit_handler);
 }
