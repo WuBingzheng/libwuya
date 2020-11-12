@@ -1,4 +1,4 @@
-CFLAGS += -g -Wall -O2
+CFLAGS += -g -Wall -Werror -O2
 
 all: libwuya.a
 

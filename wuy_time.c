@@ -19,7 +19,7 @@ static int wuy_time_local_gmtoff(void)
 int wuy_time_rfc3339(char *buffer, int gmt_offset)
 {
 #define WUY_TIME_SIZE_SEC	(sizeof("2018-09-19T16:53:50") - 1)
-	static char buf_sec[WUY_TIME_SIZE_SEC + 1];
+	static char buf_sec[WUY_TIME_SIZE_SEC + 20]; /* +20 to avoid GCC warning */
 	static time_t last_sec;
 
 	struct timeval now;

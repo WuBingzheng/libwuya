@@ -20,32 +20,28 @@
 #define _debug printf
 //#define _debug(...)
 
-struct wuy_shmpool_shared {
-	char		name[100];
-	size_t		big_size;
-	int		big_max;
-	int		big_index;
-	size_t		small_size;
-	size_t		small_pos;
-	char		small_buffer[0];
-};
-
 struct wuy_shmpool_map_info {
 	void		*address;
 	size_t		length;
 };
-struct wuy_shmpool_local {
-	struct wuy_shmpool_shared	*shared_pool;
-	int				big_index;
-	size_t				small_pos;
-	wuy_list_node_t			list_node;
+struct wuy_shmpool {
+	char		name[100];
+	size_t		big_size;
+	int		big_max;
+	size_t		small_size;
+	char		*small_buffer;
+
+	int		big_index;
+	size_t		small_pos;
+
+	wuy_list_node_t	list_node;
+
 	struct wuy_shmpool_map_info	map_infos[0];
 };
 
-static pthread_mutex_t *wuy_shmpool_lock;
+static WUY_LIST(wuy_shmpool_head);
 
-static WUY_LIST(wuy_shmpool_local_head);
-static struct wuy_shmpool_local *wuy_shmpool_current;
+static struct wuy_shmpool *wuy_shmpool_current;
 
 static void *wuy_shmpool_alloc_permanent(size_t size)
 {
@@ -78,7 +74,10 @@ static void *wuy_shmpool_open_mmap(const char *name, size_t size)
 	struct stat buf;
 	fstat(fd, &buf);
 	if (buf.st_size == 0) {
-		ftruncate(fd, size);
+		if (ftruncate(fd, size) < 0) {
+			printf("wuy_shmpool: fail in ftruncate: %ld\n", size);
+			return NULL;
+		}
 	} else if (buf.st_size != size) {
 		printf("wuy_shmpool: fail in size: %ld %ld\n", size, buf.st_size);
 		return NULL;
@@ -93,90 +92,71 @@ static void *wuy_shmpool_open_mmap(const char *name, size_t size)
 	return ret;
 }
 
-struct wuy_shmpool_local *wuy_shmpool_new(const char *name, size_t small_size,
+struct wuy_shmpool *wuy_shmpool_new(const char *name, size_t small_size,
 		size_t big_size, int big_max)
 {
 	_debug("wuy_shmpool: new pool name=%s\n", name);
 
-	/* shared */
-	pthread_mutex_lock(wuy_shmpool_lock);
-
-	struct wuy_shmpool_shared *shared_pool = wuy_shmpool_open_mmap(name, sizeof(struct wuy_shmpool_shared) + small_size);
-
-	if (shared_pool->name[0] == '\0') {
-		strncpy(shared_pool->name, name, sizeof(shared_pool->name));
-		shared_pool->small_size = small_size;
-		shared_pool->big_size = big_size;
-		shared_pool->big_max = big_max;
-
-	} else if (strcmp(shared_pool->name, name) != 0) {
-		printf("wuy_shmpool: fail in match!!!\n");
-		pthread_mutex_unlock(wuy_shmpool_lock);
-		return NULL;
-	}
-
-	pthread_mutex_unlock(wuy_shmpool_lock);
-
-	/* local */
-	struct wuy_shmpool_local *local_pool = calloc(1, sizeof(struct wuy_shmpool_local)
+	struct wuy_shmpool *pool = calloc(1, sizeof(struct wuy_shmpool)
 			+ sizeof(struct wuy_shmpool_map_info) * big_max);
-	local_pool->shared_pool = shared_pool;
-	wuy_list_append(&wuy_shmpool_local_head, &local_pool->list_node);
+	strncpy(pool->name, name, sizeof(pool->name) - 1);
+	pool->big_size = big_size;
+	pool->big_max = big_max;
+	pool->small_size = small_size;
+	pool->small_buffer = wuy_shmpool_open_mmap(name, small_size);
 
-	wuy_shmpool_current = local_pool;
-	return local_pool;
+	wuy_list_append(&wuy_shmpool_head, &pool->list_node);
+
+	wuy_shmpool_current = pool;
+	return pool;
 }
 
-// XXX need lock?
-void wuy_shmpool_release(struct wuy_shmpool_local *local_pool)
+void wuy_shmpool_release(struct wuy_shmpool *pool)
 {
-	struct wuy_shmpool_shared *shared_pool = local_pool->shared_pool;
-	const char *name = shared_pool->name;
+	_debug("wuy_shmpool: release pool %s\n", pool->name);
 
-	_debug("wuy_shmpool: release pool %s\n", name);
+	shm_unlink(pool->name);
+	munmap(pool->small_buffer, pool->small_size);
 
-	for (int i = 0; i < local_pool->big_index; i++) {
-		char name[1000];
-		sprintf(name, "%s-big-%d", name, i);
-		shm_unlink(name);
+	for (int i = 0; i < pool->big_index; i++) {
+		char big_name[1000];
+		sprintf(big_name, "%s-big-%d", pool->name, i);
+		shm_unlink(big_name);
 
-		struct wuy_shmpool_map_info *info = &local_pool->map_infos[i];
+		struct wuy_shmpool_map_info *info = &pool->map_infos[i];
 		munmap(info->address, info->length);
 	}
-	shm_unlink(name);
-	munmap(shared_pool, sizeof(struct wuy_shmpool_shared) + shared_pool->small_size);
+
+	wuy_list_delete(&pool->list_node);
+	free(pool);
 }
 
 static void *wuy_shmpool_alloc_small(size_t size)
 {
-	struct wuy_shmpool_shared *shared_pool = wuy_shmpool_current->shared_pool;
-
-	if (shared_pool->small_size - wuy_shmpool_current->small_pos < size) {
+	if (wuy_shmpool_current->small_size - wuy_shmpool_current->small_pos < size) {
 		_debug("wuy_shmpool: fail in alloc small total=%lu pos=%lu size=%lu\n",
-				shared_pool->small_size, wuy_shmpool_current->small_pos, size);
+				wuy_shmpool_current->small_size, wuy_shmpool_current->small_pos, size);
 		return NULL;
 	}
 
-	void *ret = shared_pool->small_buffer + wuy_shmpool_current->small_pos;
+	void *ret = wuy_shmpool_current->small_buffer + wuy_shmpool_current->small_pos;
 	wuy_shmpool_current->small_pos += size;
 	return ret;
 }
 
 static void *wuy_shmpool_alloc_big(size_t size)
 {
-	struct wuy_shmpool_shared *shared_pool = wuy_shmpool_current->shared_pool;
-
 	_debug("wuy_shmpool big alloc: %s index=%d size=%lu\n",
-			shared_pool->name, wuy_shmpool_current->big_index, size);
+			wuy_shmpool_current->name, wuy_shmpool_current->big_index, size);
 
-	if (wuy_shmpool_current->big_index >= shared_pool->big_max) {
+	if (wuy_shmpool_current->big_index >= wuy_shmpool_current->big_max) {
 		return NULL;
 	}
 
 	int big_index = wuy_shmpool_current->big_index++;
 
-	char name[1000];
-	sprintf(name, "%s-big-%d", shared_pool->name, big_index);
+	char name[200];
+	sprintf(name, "%s-big-%d", wuy_shmpool_current->name, big_index);
 
 	void *ret = wuy_shmpool_open_mmap(name, size);
 
@@ -195,55 +175,22 @@ void *wuy_shmpool_alloc(size_t size)
 		return wuy_shmpool_alloc_permanent(size);
 	}
 
-	if (size > wuy_shmpool_current->shared_pool->big_size) {
+	if (size > wuy_shmpool_current->big_size) {
 		return wuy_shmpool_alloc_big(size);
 	} else {
 		return wuy_shmpool_alloc_small(size);
 	}
 }
 
-bool wuy_shmpool_finish(struct wuy_shmpool_local *local_pool)
+void wuy_shmpool_finish(struct wuy_shmpool *pool)
 {
-	struct wuy_shmpool_shared *shared_pool = local_pool->shared_pool;
-
-	pthread_mutex_lock(wuy_shmpool_lock);
-
-	bool check = true;
-
-	if (shared_pool->small_pos == 0) {
-		shared_pool->small_pos = local_pool->small_pos;
-	} else if (shared_pool->small_pos != local_pool->small_pos) {
-		check = false;
-	}
-
-	if (shared_pool->big_index == 0) {
-		shared_pool->big_index = local_pool->big_index;
-	} else if (shared_pool->big_index != local_pool->big_index) {
-		check = false;
-	}
-
-	pthread_mutex_unlock(wuy_shmpool_lock);
-
 	wuy_shmpool_current = NULL;
-	return check;
 }
 
-static void wuy_shmpool_local_exit_handler(void)
+void wuy_shmpool_cleanup(void)
 {
-	struct wuy_shmpool_local *local_pool;
-	while (wuy_list_pop_type(&wuy_shmpool_local_head, local_pool, list_node)) {
-		wuy_shmpool_release(local_pool);
+	struct wuy_shmpool *pool;
+	while (wuy_list_pop_type(&wuy_shmpool_head, pool, list_node)) {
+		wuy_shmpool_release(pool);
 	}
-}
-void wuy_shmpool_init(void)
-{
-	wuy_shmpool_lock = wuy_shmpool_alloc_permanent(sizeof(pthread_mutex_t));
-
-	pthread_mutexattr_t attr;
-	pthread_mutexattr_init(&attr);
-	pthread_mutexattr_setpshared(&attr, 1);
-	pthread_mutex_init(wuy_shmpool_lock, &attr);
-	pthread_mutexattr_destroy(&attr);
-
-	atexit(wuy_shmpool_local_exit_handler);
 }
