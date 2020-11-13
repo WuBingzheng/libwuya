@@ -100,6 +100,24 @@ static inline void wuy_list_append(wuy_list_t *list,
 	_list_add(node, list->head.prev, &list->head);
 }
 
+/**
+ *  * @brief Add node after the dest.
+ *   */
+static inline void wuy_list_add_after(wuy_list_node_t *dest,
+		                wuy_list_node_t *node)
+{
+	        _list_add(node, dest, dest->next);
+}
+
+/**
+ *  * @brief Add node before the dest.
+ *   */
+static inline void wuy_list_add_before(wuy_list_node_t *dest,
+		                wuy_list_node_t *node)
+{
+	        _list_add(node, dest->prev, dest);
+}
+
 static inline void _list_del(wuy_list_node_t *prev,
 		wuy_list_node_t *next)
 {
