@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <errno.h>
 #include <lua5.1/lua.h>
 #include <lua5.1/lauxlib.h>
 
@@ -352,6 +353,7 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 	}
 
 	if (table->post != NULL) {
+		errno = 0;
 		const char *err = table->post(container);
 		if (err != WUY_CFLUA_OK) {
 			wuy_cflua_post_err = err;
@@ -470,6 +472,9 @@ static const char *wuy_cflua_strerror(lua_State *L, int err)
 		break;
 	case WUY_CFLUA_ERR_POST:
 		p += sprintf(p, "post handler fails: %s", wuy_cflua_post_err);
+		if (errno != 0) {
+			p += sprintf(p, ": %s", strerror(errno));
+		}
 		break;
 	case WUY_CFLUA_ERR_TOO_DEEP_META:
 		p += sprintf(p, "too deep metatable");
