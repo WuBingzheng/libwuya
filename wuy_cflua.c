@@ -29,7 +29,7 @@ static struct wuy_cflua_stack {
 static int wuy_cflua_stack_index = 0;
 
 static const char *wuy_cflua_post_err;
-const char *wuy_cflua_post_arg = NULL; /* set by user */
+const char *wuy_cflua_post_arg; /* set by user */
 
 static struct wuy_cflua_command	*wuy_cflua_current_cmd;
 
@@ -293,7 +293,7 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 		lua_pop(L, 1);
 		if (hit != NULL) {
 			wuy_cflua_assign_value(cmd, container, hit);
-			goto out;
+			return 0;
 		}
 
 		/* allocate new container */
@@ -363,7 +363,6 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 		}
 	}
 
-out:
 	wuy_cflua_stack_index--;
 	return 0;
 }
@@ -562,6 +561,8 @@ const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table, void *c
 		.type = WUY_CFLUA_TYPE_TABLE,
 		.u.table = table,
 	};
+
+	wuy_cflua_stack_index = 0;
 	int ret = wuy_cflua_set_table(L, &tmp, container);
 
 	return wuy_cflua_strerror(L, ret);
