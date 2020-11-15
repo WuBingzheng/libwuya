@@ -458,9 +458,33 @@ static const char *wuy_cflua_strtype(enum wuy_cflua_type type)
 }
 static const char *wuy_cflua_strerror(lua_State *L, int err)
 {
+	if (err == WUY_CFLUA_ERR_OK) {
+		return WUY_CFLUA_OK;
+	}
+
 	static char buffer[3000];
 	char *p = buffer, *end = buffer + sizeof(buffer);
 
+	/* stack */
+	for (int i = 0; i < wuy_cflua_stack_index; i++) {
+		struct wuy_cflua_stack *stack = &wuy_cflua_stacks[i];
+		struct wuy_cflua_command *cmd = stack->cmd;
+		if (cmd->u.table->name != NULL) {
+			p += cmd->u.table->name(stack->container, p, end - p);
+		} else if (cmd->name != NULL) {
+			p += snprintf(p, end - p, "%s>", cmd->name);
+		} else {
+			p += snprintf(p, end - p, "[ARRAY]>");
+		}
+	}
+
+	/* delete the last '>' */
+	if (p > buffer && p[-1] == '>') {
+		p[-1] = ':';
+	}
+	*p++ = ' ';
+
+	/* reason */
 	switch (err) {
 	case WUY_CFLUA_ERR_OK:
 		return WUY_CFLUA_OK;
@@ -522,25 +546,6 @@ static const char *wuy_cflua_strerror(lua_State *L, int err)
 	default:
 		p += sprintf(p, "!!! impossible error code: %d", err);
 		return buffer;
-	}
-
-	p += sprintf(p, " at ");
-
-	for (int i = 0; i < wuy_cflua_stack_index; i++) {
-		struct wuy_cflua_stack *stack = &wuy_cflua_stacks[i];
-		struct wuy_cflua_command *cmd = stack->cmd;
-		if (cmd->u.table->name != NULL) {
-			p += cmd->u.table->name(stack->container, p, end - p);
-		} else if (cmd->name != NULL) {
-			p += snprintf(p, end - p, "%s>", cmd->name);
-		} else {
-			p += snprintf(p, end - p, "[ARRAY]>");
-		}
-	}
-
-	/* delete the last '>' */
-	if (p > buffer && p[-1] == '>') {
-		p[-1] = '.';
 	}
 
 	return buffer;
