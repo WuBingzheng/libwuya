@@ -29,6 +29,7 @@ static struct wuy_cflua_stack {
 static int wuy_cflua_stack_index = 0;
 
 static const char *wuy_cflua_post_err;
+const char *wuy_cflua_post_arg = NULL; /* set by user */
 
 static struct wuy_cflua_command	*wuy_cflua_current_cmd;
 
@@ -354,6 +355,7 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 
 	if (table->post != NULL) {
 		errno = 0;
+		wuy_cflua_post_arg = NULL;
 		const char *err = table->post(container);
 		if (err != WUY_CFLUA_OK) {
 			wuy_cflua_post_err = err;
@@ -496,6 +498,9 @@ static const char *wuy_cflua_strerror(lua_State *L, int err)
 		break;
 	case WUY_CFLUA_ERR_POST:
 		p += sprintf(p, "post handler fails: %s", wuy_cflua_post_err);
+		if (wuy_cflua_post_arg != NULL) {
+			p += sprintf(p, " `%s`", wuy_cflua_post_arg);
+		}
 		if (errno != 0) {
 			p += sprintf(p, ": %s", strerror(errno));
 		}

@@ -107,6 +107,9 @@ struct wuy_cflua_table {
 #define WUY_CFLUA_OK (const char *)0
 const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table, void *container);
 
+/* set by user if necessary when table's post hander fails */
+extern const char *wuy_cflua_post_arg;
+
 struct wuy_cflua_table *wuy_cflua_copy_table_default(const struct wuy_cflua_table *src,
 		const void *default_container);
 void wuy_cflua_free_copied_table(struct wuy_cflua_table *table);
