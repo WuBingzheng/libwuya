@@ -6,12 +6,28 @@
 
 #include "wuy_cflua.h"
 
+enum wuy_cflua_error {
+	WUY_CFLUA_ERR_OK = 0,
+	WUY_CFLUA_ERR_NO_MEM,
+	WUY_CFLUA_ERR_DEPLICATE_MEMBER,
+	WUY_CFLUA_ERR_POST,
+	WUY_CFLUA_ERR_TOO_DEEP_META,
+	WUY_CFLUA_ERR_WRONG_TYPE,
+	WUY_CFLUA_ERR_LIMIT,
+	WUY_CFLUA_ERR_NO_ARRAY,
+	WUY_CFLUA_ERR_INVALID_TYPE,
+	WUY_CFLUA_ERR_INVALID_CMD,
+	WUY_CFLUA_ERR_ARBITRARY,
+};
+
 /* table-stack for wuy_cflua_strerror() */
 static struct wuy_cflua_stack {
 	struct wuy_cflua_command	*cmd;
 	void				*container;
 } wuy_cflua_stacks[100];
 static int wuy_cflua_stack_index = 0;
+
+static const char *wuy_cflua_post_err;
 
 static struct wuy_cflua_command	*wuy_cflua_current_cmd;
 
@@ -336,7 +352,9 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 	}
 
 	if (table->post != NULL) {
-		if (!table->post(container)) {
+		const char *err = table->post(container);
+		if (err != WUY_CFLUA_OK) {
+			wuy_cflua_post_err = err;
 			return WUY_CFLUA_ERR_POST;
 		}
 	}
@@ -423,15 +441,6 @@ static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *
 	}
 }
 
-int wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table, void *container)
-{
-	struct wuy_cflua_command tmp = {
-		.type = WUY_CFLUA_TYPE_TABLE,
-		.u.table = table,
-	};
-	return wuy_cflua_set_table(L, &tmp, container);
-}
-
 static const char *wuy_cflua_strtype(enum wuy_cflua_type type)
 {
 	switch (type) {
@@ -445,12 +454,14 @@ static const char *wuy_cflua_strtype(enum wuy_cflua_type type)
 	default: return "invalid type!";
 	}
 }
-const char *wuy_cflua_strerror(lua_State *L, int err)
+static const char *wuy_cflua_strerror(lua_State *L, int err)
 {
 	static char buffer[3000];
 	char *p = buffer, *end = buffer + sizeof(buffer);
 
 	switch (err) {
+	case WUY_CFLUA_ERR_OK:
+		return WUY_CFLUA_OK;
 	case WUY_CFLUA_ERR_NO_MEM:
 		p += sprintf(p, "no-memory");
 		break;
@@ -458,7 +469,7 @@ const char *wuy_cflua_strerror(lua_State *L, int err)
 		p += sprintf(p, "duplicated member");
 		break;
 	case WUY_CFLUA_ERR_POST:
-		p += sprintf(p, "table post handler fails");
+		p += sprintf(p, "post handler fails: %s", wuy_cflua_post_err);
 		break;
 	case WUY_CFLUA_ERR_TOO_DEEP_META:
 		p += sprintf(p, "too deep metatable");
@@ -528,6 +539,17 @@ const char *wuy_cflua_strerror(lua_State *L, int err)
 	}
 
 	return buffer;
+}
+
+const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table, void *container)
+{
+	struct wuy_cflua_command tmp = {
+		.type = WUY_CFLUA_TYPE_TABLE,
+		.u.table = table,
+	};
+	int ret = wuy_cflua_set_table(L, &tmp, container);
+
+	return wuy_cflua_strerror(L, ret);
 }
 
 

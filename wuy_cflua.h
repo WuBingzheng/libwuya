@@ -4,18 +4,6 @@
 #include <stdbool.h>
 #include <lua5.1/lua.h>
 
-/* return error code */
-#define WUY_CFLUA_ERR_NO_MEM		-1
-#define WUY_CFLUA_ERR_DEPLICATE_MEMBER	-2
-#define WUY_CFLUA_ERR_POST		-3
-#define WUY_CFLUA_ERR_TOO_DEEP_META	-4
-#define WUY_CFLUA_ERR_WRONG_TYPE	-5
-#define WUY_CFLUA_ERR_LIMIT		-6
-#define WUY_CFLUA_ERR_NO_ARRAY		-7
-#define WUY_CFLUA_ERR_INVALID_TYPE	-8
-#define WUY_CFLUA_ERR_INVALID_CMD	-9
-#define WUY_CFLUA_ERR_ARBITRARY		-10
-
 /* `type` in `struct wuy_cflua_command` */
 enum wuy_cflua_type {
 	WUY_CFLUA_TYPE_END = 0,
@@ -109,17 +97,15 @@ struct wuy_cflua_table {
 	void			(*init)(void *);
 
 	/* handler called after parsing */
-	bool			(*post)(void *);
+	const char *		(*post)(void *);
 
 	/* handler for arbitrary key-value options */
 	bool			(*arbitrary)(lua_State *);
 };
 
-/* parse */
-int wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table, void *container);
-
-/* param err  is returned by wuy_cflua_parse(). */
-const char *wuy_cflua_strerror(lua_State *L, int err);
+/* return WUY_CFLUA_OK if successful, or error reason if fail */
+#define WUY_CFLUA_OK (const char *)0
+const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table, void *container);
 
 struct wuy_cflua_table *wuy_cflua_copy_table_default(const struct wuy_cflua_table *src,
 		const void *default_container);
