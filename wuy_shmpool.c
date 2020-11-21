@@ -127,7 +127,6 @@ void wuy_shmpool_release(struct wuy_shmpool *pool)
 		munmap(info->address, info->length);
 	}
 
-	wuy_list_delete(&pool->list_node);
 	free(pool);
 }
 
