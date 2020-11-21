@@ -14,8 +14,8 @@ struct wuy_dict_s {
 	wuy_dict_key_type_e	key_type;
 	size_t			key_offset;
 
-	wuy_hlist_head_t	*buckets;
-	wuy_hlist_head_t	*prev_buckets;
+	wuy_hlist_t		*buckets;
+	wuy_hlist_t		*prev_buckets;
 
 	uint32_t		bucket_size;
 	uint32_t		split;
@@ -37,7 +37,7 @@ static wuy_dict_t *wuy_dict_new(size_t node_offset)
 	assert(dict != NULL);
 
 	dict->bucket_size = WUY_DICT_SIZE_INIT;
-	dict->buckets = calloc(dict->bucket_size, sizeof(wuy_hlist_head_t));
+	dict->buckets = calloc(dict->bucket_size, sizeof(wuy_hlist_t));
 	assert(dict->buckets != NULL);
 
 	dict->node_offset = node_offset;
@@ -89,9 +89,9 @@ void wuy_dict_disable_expasion(wuy_dict_t *dict, uint32_t bucket_size)
 	}
 
 	dict->bucket_size = align;
-	dict->buckets = realloc(dict->buckets, align * sizeof(wuy_hlist_head_t));
+	dict->buckets = realloc(dict->buckets, align * sizeof(wuy_hlist_t));
 	assert(dict->buckets != NULL);
-	bzero(dict->buckets, align * sizeof(wuy_hlist_head_t));
+	bzero(dict->buckets, align * sizeof(wuy_hlist_t));
 }
 
 static const void *_item_to_key(wuy_dict_t *dict, const void *item)
@@ -187,8 +187,7 @@ static void wuy_dict_expasion(wuy_dict_t *dict)
 			&& dict->prev_buckets == NULL
 			&& dict->bucket_size < WUY_DICT_SIZE_MAX) {
 
-		wuy_hlist_head_t *newb = calloc(dict->bucket_size * 2,
-				sizeof(wuy_hlist_head_t));
+		wuy_hlist_t *newb = calloc(dict->bucket_size * 2, sizeof(wuy_hlist_t));
 		if (newb == NULL) {
 			/* if calloc fails, do nothing */
 			return;
@@ -208,8 +207,7 @@ static void wuy_dict_expasion(wuy_dict_t *dict)
 			uint32_t index = wuy_dict_index_item(dict, item);
 			wuy_hlist_insert(&dict->buckets[index], node);
 		}
-		wuy_hlist_head_init(&dict->prev_buckets[dict->split]);
-
+		wuy_hlist_init(&dict->prev_buckets[dict->split]);
 		dict->split++;
 		if (dict->split == dict->bucket_size / 2) {
 			/* expansion finish */
@@ -293,8 +291,8 @@ size_t wuy_dict_count(wuy_dict_t *dict)
 	return dict->count;
 }
 
-bool _wuy_dict_iter_buckets(wuy_dict_t *dict, wuy_hlist_head_t **start,
-		wuy_hlist_head_t **end)
+bool _wuy_dict_iter_buckets(wuy_dict_t *dict, wuy_hlist_t **start,
+		wuy_hlist_t **end)
 {
 	if (*start == NULL) {
 		*start = dict->buckets;

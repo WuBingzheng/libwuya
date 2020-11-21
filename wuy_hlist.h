@@ -26,16 +26,16 @@
 #include "wuy_container.h"
 
 /**
- * @brief Head of list.
+ * @brief The list.
  */
-typedef struct wuy_hlist_head_s wuy_hlist_head_t;
+typedef struct wuy_hlist_s wuy_hlist_t;
 
 /**
  * @brief Embed this node into your data struct in order to use this lib.
  */
 typedef struct wuy_hlist_node_s wuy_hlist_node_t;
 
-struct wuy_hlist_head_s {
+struct wuy_hlist_s {
 	wuy_hlist_node_t *first;
 };
 struct wuy_hlist_node_s {
@@ -45,40 +45,40 @@ struct wuy_hlist_node_s {
 /**
  * @brief Initialize at declare.
  */
-#define WUY_HLIST_HEAD_INIT { .first = NULL }
+#define WUY_HLIST_INIT { .first = NULL }
 
 /**
  * @brief Declare and initialize.
  */
-#define WUY_HLIST_HEAD(name) wuy_hlist_head_t name = { .first = NULL }
+#define WUY_HLIST(name) wuy_hlist_t name = { .first = NULL }
 
 /**
- * @brief Initialize a head.
+ * @brief Initialize a list.
  */
-static inline void wuy_hlist_head_init(wuy_hlist_head_t *head)
+static inline void wuy_hlist_init(wuy_hlist_t *list)
 {
-	head->first = NULL;
+	list->first = NULL;
 }
 
 /**
- * @brief Return if the list head is empty.
+ * @brief Return if the list is empty.
  */
-static inline int wuy_hlist_empty(const wuy_hlist_head_t *head)
+static inline int wuy_hlist_empty(const wuy_hlist_t *list)
 {
-	return head->first == NULL;
+	return list->first == NULL;
 }
 
 /**
  * @brief Add node after head.
  */
-static inline void wuy_hlist_insert(wuy_hlist_head_t *head, wuy_hlist_node_t *node)
+static inline void wuy_hlist_insert(wuy_hlist_t *list, wuy_hlist_node_t *node)
 {
-	wuy_hlist_node_t *first = head->first;
+	wuy_hlist_node_t *first = list->first;
 	node->next = first;
 	if (first)
 		first->pprev = &node->next;
-	head->first = node;
-	node->pprev = &head->first;
+	list->first = node;
+	node->pprev = &list->first;
 }
 
 /**
@@ -96,14 +96,14 @@ static inline void wuy_hlist_delete(wuy_hlist_node_t *node)
 /**
  * @brief Iterate over a list, while it's NOT safe to delete node.
  */
-#define wuy_hlist_iter(head, pos) \
-	for (pos = (head)->first; pos; pos = pos->next)
+#define wuy_hlist_iter(list, pos) \
+	for (pos = (list)->first; pos; pos = pos->next)
 
 /**
  * @brief Iterate over a list, while it's safe to delete node.
  */
-#define wuy_hlist_iter_safe(head, pos, n) \
-	for (pos = (head)->first, n = pos?pos->next:NULL; pos; \
+#define wuy_hlist_iter_safe(list, pos, n) \
+	for (pos = (list)->first, n = pos?pos->next:NULL; pos; \
 		pos = n, n = pos?pos->next:NULL)
 
 /**
@@ -117,8 +117,8 @@ static inline void wuy_hlist_delete(wuy_hlist_node_t *node)
  * Use @wuy_hlist_iter and @wuy_hlist_iter_safe only when you do not
  * know the container's type, e.g. in wuy_dict.c .
  */
-#define wuy_hlist_iter_type(head, p, member) \
-	for (wuy_hlist_node_t *_next, *_iter = (head)->first; \
+#define wuy_hlist_iter_type(list, p, member) \
+	for (wuy_hlist_node_t *_next, *_iter = (list)->first; \
 		_iter != NULL && (_next = _iter->next, \
 			p = wuy_containerof(_iter, typeof(*p), member)); \
 		_iter = _next)

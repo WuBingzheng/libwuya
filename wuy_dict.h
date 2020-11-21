@@ -157,16 +157,16 @@ void wuy_dict_del_node(wuy_hlist_node_t *node);
 size_t wuy_dict_count(wuy_dict_t *dict);
 
 /* internal. used by wuy_dict_iter. */
-bool _wuy_dict_iter_buckets(wuy_dict_t *dict, wuy_hlist_head_t **start,
-		wuy_hlist_head_t **end);
+bool _wuy_dict_iter_buckets(wuy_dict_t *dict, wuy_hlist_t **start,
+		wuy_hlist_t **end);
 
 /**
  * @brief Iterate over a dict.
  */
 #define wuy_dict_iter(dict, p) \
-	for (wuy_hlist_head_t *_ibck_start = NULL, *_ibck_end = NULL; \
+	for (wuy_hlist_t *_ibck_start = NULL, *_ibck_end = NULL; \
 		_wuy_dict_iter_buckets(dict, &_ibck_start, &_ibck_end); ) \
-		for (wuy_hlist_head_t *_ib = _ibck_start; _ib < _ibck_end; _ib++) \
+		for (wuy_hlist_t *_ib = _ibck_start; _ib < _ibck_end; _ib++) \
 			wuy_hlist_iter(_ib, p)
 
 /**
