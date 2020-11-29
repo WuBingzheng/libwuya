@@ -63,6 +63,7 @@ struct wuy_cflua_command {
 		wuy_cflua_function_t	f;
 		const char		*s;
 		const void		*p;
+		const void		*t;
 	} default_value;
 
 	/* limits, only for WUY_CFLUA_TYPE_INTEGER and WUY_CFLUA_TYPE_DOUBLE */

@@ -435,9 +435,13 @@ static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *
 		wuy_cflua_assign_value(cmd, container, cmd->default_value.f);
 		return;
 	case WUY_CFLUA_TYPE_TABLE:
-		lua_newtable(L);
-		wuy_cflua_set_table(L, cmd, container);
-		lua_pop(L, 1);
+		if (cmd->default_value.t != NULL) {
+			wuy_cflua_assign_value(cmd, container, cmd->default_value.t);
+		} else {
+			lua_newtable(L);
+			wuy_cflua_set_table(L, cmd, container);
+			lua_pop(L, 1);
+		}
 		return;
 	default:
 		abort();
@@ -602,13 +606,15 @@ static void wuy_cflua_copy_cmd_default(struct wuy_cflua_command *dcmd,
 {
 	*dcmd = *scmd;
 
-	const char *def = (const char *)default_container + scmd->offset;
+	const void *def = (const char *)default_container + scmd->offset;
 	if (scmd->type != WUY_CFLUA_TYPE_TABLE) {
 		memcpy(&dcmd->default_value, def, wuy_cflua_type_size(scmd->type));
 	} else if (scmd->u.table->size == 0) {
 		dcmd->u.table = wuy_cflua_copy_table_default(scmd->u.table, def);
 	} else if (*(const void **)def != NULL) {
-		dcmd->u.table = wuy_cflua_copy_table_default(scmd->u.table, *(const void **)def);
+		def = *(const void **)def;
+		dcmd->u.table = wuy_cflua_copy_table_default(scmd->u.table, def);
+		dcmd->default_value.t = def;
 	} else {
 		dcmd->real = (void *)1;
 	}
