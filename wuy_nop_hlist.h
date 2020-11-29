@@ -56,27 +56,28 @@ static inline int wuy_nop_hlist_empty(const wuy_nop_hlist_t *list)
 }
 
 static inline wuy_nop_hlist_addr_t _nop_hlist_2addr(const wuy_nop_hlist_node_t *node,
-		const wuy_nop_hlist_t *list)
+		const void *base)
 {
-	return (uintptr_t)node - (uintptr_t)list;
+	return (uintptr_t)node - (uintptr_t)base;
 }
 static inline wuy_nop_hlist_node_t *_nop_hlist_2node(wuy_nop_hlist_addr_t addr,
-		const wuy_nop_hlist_t *list)
+		const void *base)
 {
-	return (wuy_nop_hlist_node_t *)((char *)list + addr);
+	return (wuy_nop_hlist_node_t *)((char *)base + addr);
 }
 
 /**
  * @brief Add node after head.
  */
-static inline void wuy_nop_hlist_insert(wuy_nop_hlist_t *list, wuy_nop_hlist_node_t *node)
+static inline void wuy_nop_hlist_insert(wuy_nop_hlist_t *list,
+		wuy_nop_hlist_node_t *node, const void *base)
 {
 	wuy_nop_hlist_addr_t first_addr = list->first;
-	wuy_nop_hlist_addr_t node_addr = _nop_hlist_2addr(node, list);
+	wuy_nop_hlist_addr_t node_addr = _nop_hlist_2addr(node, base);
 
 	node->next = first_addr;
 	if (first_addr != 0) {
-		wuy_nop_hlist_node_t *first = _nop_hlist_2node(first_addr, list);
+		wuy_nop_hlist_node_t *first = _nop_hlist_2node(first_addr, base);
 		first->pprev = node_addr + offsetof(wuy_nop_hlist_node_t, next);
 	}
 	list->first = node_addr;
@@ -86,32 +87,31 @@ static inline void wuy_nop_hlist_insert(wuy_nop_hlist_t *list, wuy_nop_hlist_nod
 /**
  * @brief Delete node from its list.
  */
-static inline void wuy_nop_hlist_delete(wuy_nop_hlist_t *list, wuy_nop_hlist_node_t *node)
+static inline void wuy_nop_hlist_delete(wuy_nop_hlist_node_t *node, const void *base)
 {
 	if (node->next != 0) {
-		wuy_nop_hlist_node_t *next = _nop_hlist_2node(node->next, list);
+		wuy_nop_hlist_node_t *next = _nop_hlist_2node(node->next, base);
 		next->pprev = node->pprev;
 	}
 
-	wuy_nop_hlist_addr_t *pprev = (wuy_nop_hlist_addr_t *)_nop_hlist_2node(node->pprev, list);
+	wuy_nop_hlist_addr_t *pprev = (wuy_nop_hlist_addr_t *)_nop_hlist_2node(node->pprev, base);
 	*pprev = node->next;
 }
 
 /**
  * @brief Iterate over a list, while it's NOT safe to delete node.
  */
-#define wuy_nop_hlist_iter(list, pos) \
-	for (pos = _nop_hlist_2node((list)->first, list); \
-			pos != (wuy_nop_hlist_node_t *)list; \
-			pos = _nop_hlist_2node(pos->next, list))
+#define wuy_nop_hlist_iter(list, pos, base) \
+	for (pos = _nop_hlist_2node((list)->first, base); pos != base; \
+			pos = _nop_hlist_2node(pos->next, base))
 
 /**
  * @brief Iterate over a list, while it's safe to delete node.
  */
-#define wuy_nop_hlist_iter_safe(list, pos, n) \
-	for (pos = _nop_hlist_2node((list)->first, list), n = _nop_hlist_2node(pos->next, list); \
-			pos != (wuy_nop_hlist_node_t *)list; \
-			pos = n, n = _nop_hlist_2node(pos->next, list))
+#define wuy_nop_hlist_iter_safe(list, pos, n, base) \
+	for (pos = _nop_hlist_2node((list)->first, base), n = _nop_hlist_2node(pos->next, base); \
+			pos != base; \
+			pos = n, n = _nop_hlist_2node(pos->next, base))
 
 /**
  * @brief Iterate over a list. It's safe to delete node during it.
@@ -124,10 +124,9 @@ static inline void wuy_nop_hlist_delete(wuy_nop_hlist_t *list, wuy_nop_hlist_nod
  * Use @wuy_nop_hlist_iter and @wuy_nop_hlist_iter_safe only when you do not
  * know the container's type, e.g. in wuy_dict.c .
  */
-#define wuy_nop_hlist_iter_type(list, p, member) \
-	for (wuy_nop_hlist_addr_t _next_addr, _iter_addr = (list)->first; \
-		_iter_addr != 0 && (_next_addr = _iter_addr->next, \
-			p = wuy_containerof(_nop_hlist_2node(_iter_addr, list), typeof(*p), member)); \
-		_iter_addr = _next_addr)
+#define wuy_nop_hlist_iter_type(list, p, member, base) \
+	for (wuy_nop_hlist_node_t *_node = _nop_hlist_2node((list)->first, base); \
+			_node != (void *)base && (p = wuy_containerof(_node, typeof(*p), member)); \
+			_node = _nop_hlist_2node(_node->next, base))
 
 #endif
