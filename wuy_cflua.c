@@ -31,6 +31,9 @@ static int wuy_cflua_stack_index = 0;
 static const char *wuy_cflua_post_err;
 const char *wuy_cflua_post_arg; /* set by user */
 
+static const char *wuy_cflua_arbitrary_err;
+const char *wuy_cflua_arbitrary_arg; /* set by user */
+
 static struct wuy_cflua_command	*wuy_cflua_current_cmd;
 
 #define WUY_CFLUA_PINT(container, offset)	*(int *)((char *)(container) + offset)
@@ -107,7 +110,7 @@ static size_t wuy_cflua_type_size(enum wuy_cflua_type type)
 	}
 }
 
-static int wuy_cflua_valid_command(lua_State *L, struct wuy_cflua_table *table)
+static int wuy_cflua_valid_command(lua_State *L, struct wuy_cflua_table *table, void *container)
 {
 	struct wuy_cflua_command *cmd;
 
@@ -131,7 +134,7 @@ static int wuy_cflua_valid_command(lua_State *L, struct wuy_cflua_table *table)
 				}
 			} else if (cmd->is_extra_commands) {
 				assert(cmd->type == WUY_CFLUA_TYPE_TABLE);
-				if (wuy_cflua_valid_command(L, cmd->u.table) == 0) {
+				if (wuy_cflua_valid_command(L, cmd->u.table, container) == 0) {
 					return 0;
 				}
 			}
@@ -144,9 +147,18 @@ static int wuy_cflua_valid_command(lua_State *L, struct wuy_cflua_table *table)
 				}
 			}
 		}
+
 		if (table->arbitrary != NULL) {
-			return table->arbitrary(L) ? 0 : WUY_CFLUA_ERR_ARBITRARY;
+			errno = 0;
+			wuy_cflua_arbitrary_err = NULL;
+			const char *err = table->arbitrary(L, container);
+			if (err != WUY_CFLUA_OK) {
+				wuy_cflua_arbitrary_err = err;
+				return WUY_CFLUA_ERR_ARBITRARY;
+			}
+			return 0;
 		}
+
 		return WUY_CFLUA_ERR_INVALID_CMD;
 	default:
 		return WUY_CFLUA_ERR_INVALID_TYPE;
@@ -345,7 +357,7 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 	if (name == NULL || name[0] != '_') {
 		lua_pushnil(L);
 		while (lua_next(L, -2) != 0) {
-			int ret = wuy_cflua_valid_command(L, table);
+			int ret = wuy_cflua_valid_command(L, table, container);
 			if (ret != 0) {
 				return ret;
 			}
@@ -508,6 +520,16 @@ static const char *wuy_cflua_strerror(lua_State *L, int err)
 			p += sprintf(p, ": %s", strerror(errno));
 		}
 		break;
+	case WUY_CFLUA_ERR_ARBITRARY:
+		p += sprintf(p, "arbitrary handler fails for %s: %s",
+				lua_tostring(L, -2), wuy_cflua_arbitrary_err);
+		if (wuy_cflua_arbitrary_arg != NULL) {
+			p += sprintf(p, " `%s`", wuy_cflua_arbitrary_arg);
+		}
+		if (errno != 0) {
+			p += sprintf(p, ": %s", strerror(errno));
+		}
+		break;
 	case WUY_CFLUA_ERR_TOO_DEEP_META:
 		p += sprintf(p, "too deep metatable");
 		break;
@@ -547,9 +569,6 @@ static const char *wuy_cflua_strerror(lua_State *L, int err)
 		break;
 	case WUY_CFLUA_ERR_INVALID_CMD:
 		p += sprintf(p, "invalid command: %s", lua_tostring(L, -2));
-		break;
-	case WUY_CFLUA_ERR_ARBITRARY:
-		p += sprintf(p, "arbitrary fail for %s", lua_tostring(L, -2));
 		break;
 	default:
 		p += sprintf(p, "!!! impossible error code: %d", err);

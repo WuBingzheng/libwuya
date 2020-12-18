@@ -101,15 +101,16 @@ struct wuy_cflua_table {
 	const char *		(*post)(void *);
 
 	/* handler for arbitrary key-value options */
-	bool			(*arbitrary)(lua_State *);
+	const char *		(*arbitrary)(lua_State *, void *);
 };
 
 /* return WUY_CFLUA_OK if successful, or error reason if fail */
 #define WUY_CFLUA_OK (const char *)0
 const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table, void *container);
 
-/* set by user if necessary when table's post hander fails */
+/* set by user if necessary when table's post/arbitrary hander fails */
 extern const char *wuy_cflua_post_arg;
+extern const char *wuy_cflua_arbitrary_arg;
 
 struct wuy_cflua_table *wuy_cflua_copy_table_default(const struct wuy_cflua_table *src,
 		const void *default_container);
