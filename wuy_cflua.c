@@ -684,3 +684,98 @@ void wuy_cflua_free_copied_table(struct wuy_cflua_table *table)
 	free(table->commands);
 	free(table);
 }
+
+
+/* === dump to markdown === */
+
+static void wuy_cflua_dump_indent(int level)
+{
+	for (int i = 0; i < level; i++) {
+		printf("    ");
+	}
+}
+static void wuy_cflua_dump_command_markdown(struct wuy_cflua_command *cmd, int level)
+{
+	static char leaders[] = {'+', '-', '*', '=', '>', ':', 'o'};
+
+	wuy_cflua_dump_indent(level);
+	printf("%c `%s` _(%s", leaders[level],
+			cmd->name ? cmd->name : cmd->is_single_array ? "SINGLE_ARRAY_MEMBER" : "MULTIPLE_ARRAY_MEMBER",
+			wuy_cflua_strtype(cmd->type));
+
+	switch (cmd->type) {
+	case WUY_CFLUA_TYPE_BOOLEAN:
+		if (cmd->default_value.b) {
+			printf(":true");
+		}
+		break;
+	case WUY_CFLUA_TYPE_INTEGER:
+		if (cmd->default_value.n != 0) {
+			printf(": %d", cmd->default_value.n);
+		}
+		if (cmd->limits.n.is_lower) {
+			printf(", min=%d", cmd->limits.n.lower);
+		}
+		if (cmd->limits.n.is_upper) {
+			printf(", max=%d", cmd->limits.n.upper);
+		}
+		break;
+	case WUY_CFLUA_TYPE_DOUBLE:
+		if (cmd->default_value.d != 0) {
+			printf(": %g", cmd->default_value.d);
+		}
+		if (cmd->limits.d.is_lower) {
+			printf(", min=%g", cmd->limits.d.lower);
+		}
+		if (cmd->limits.d.is_upper) {
+			printf(", max=%g", cmd->limits.d.upper);
+		}
+		break;
+	case WUY_CFLUA_TYPE_STRING:
+		if (cmd->default_value.s != NULL) {
+			printf(": \"%s\"", cmd->default_value.s);
+		}
+		break;
+	case WUY_CFLUA_TYPE_FUNCTION:
+		break;
+	case WUY_CFLUA_TYPE_TABLE:
+		if (cmd->u.table->refer_name != NULL) {
+			printf(".%s", cmd->u.table->refer_name);
+		}
+		break;
+	default:
+		abort();
+	}
+
+	printf(")_\n\n");
+
+	if (cmd->description != NULL) {
+		wuy_cflua_dump_indent(level + 1);
+		printf("%s\n\n", cmd->description);
+	}
+
+	if (cmd->type == WUY_CFLUA_TYPE_TABLE && cmd->u.table->refer_name == NULL) {
+		wuy_cflua_dump_table_markdown(cmd->u.table, level + 1);
+	}
+}
+
+void wuy_cflua_dump_table_markdown(const struct wuy_cflua_table *table, int level)
+{
+	struct wuy_cflua_command *cmd;
+	for (cmd = table->commands; cmd->type != WUY_CFLUA_TYPE_END; cmd++) {
+		if (cmd->name != NULL && cmd->name[0] == '_') {
+			continue;
+		}
+
+		wuy_cflua_dump_command_markdown(cmd, level);
+	}
+
+	int count = 0;
+	if (cmd->u.next != NULL) {
+		struct wuy_cflua_command *(*next)(struct wuy_cflua_command *) = cmd->u.next;
+		while ((cmd = next(cmd)) != NULL) {
+			if (count++ > 10) break;
+			wuy_cflua_dump_command_markdown(cmd, level);
+		}
+	}
+}

@@ -24,6 +24,8 @@ struct wuy_cflua_command {
 	 * NULL for array member command, and non-NULL for key-value options. */
 	const char		*name;
 
+	const char		*description;
+
 	/* is single array member? */
 	bool			is_single_array;
 
@@ -85,6 +87,8 @@ struct wuy_cflua_command {
 struct wuy_cflua_table {
 	struct wuy_cflua_command	*commands;
 
+	const char		*refer_name;
+
 	/* size of new container.
 	 * If set 0, do not allocate new container and use the current container. */
 	unsigned		size;
@@ -136,5 +140,7 @@ static inline bool wuy_cflua_is_function_set(wuy_cflua_function_t f)
 #define WUY_CFLUA_LIMITS_NON_NEGATIVE	WUY_CFLUA_LIMITS_LOWER(0)
 
 void wuy_cflua_build_tables(lua_State *L, struct wuy_cflua_table *table);
+
+void wuy_cflua_dump_table_markdown(const struct wuy_cflua_table *table, int indent);
 
 #endif
