@@ -121,7 +121,10 @@ static int wuy_cflua_valid_command(lua_State *L, struct wuy_cflua_table *table, 
 				return 0;
 			}
 		}
-		return WUY_CFLUA_ERR_NO_ARRAY;
+		if (table->arbitrary == NULL) {
+			return WUY_CFLUA_ERR_NO_ARRAY;
+		}
+		break;
 	case LUA_TSTRING:;
 		const char *name = lua_tostring(L, -2);
 		if (name[0] == '_') {
@@ -148,21 +151,22 @@ static int wuy_cflua_valid_command(lua_State *L, struct wuy_cflua_table *table, 
 			}
 		}
 
-		if (table->arbitrary != NULL) {
-			errno = 0;
-			wuy_cflua_arbitrary_err = NULL;
-			const char *err = table->arbitrary(L, container);
-			if (err != WUY_CFLUA_OK) {
-				wuy_cflua_arbitrary_err = err;
-				return WUY_CFLUA_ERR_ARBITRARY;
-			}
-			return 0;
+		if (table->arbitrary == NULL) {
+			return WUY_CFLUA_ERR_INVALID_CMD;
 		}
-
-		return WUY_CFLUA_ERR_INVALID_CMD;
+		break;
 	default:
 		return WUY_CFLUA_ERR_INVALID_TYPE;
 	}
+
+	errno = 0;
+	wuy_cflua_arbitrary_err = NULL;
+	const char *err = table->arbitrary(L, container);
+	if (err != WUY_CFLUA_OK) {
+		wuy_cflua_arbitrary_err = err;
+		return WUY_CFLUA_ERR_ARBITRARY;
+	}
+	return 0;
 }
 
 static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *cmd, void *container)
