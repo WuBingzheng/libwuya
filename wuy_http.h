@@ -21,6 +21,7 @@ enum wuy_http_method {
 };
 
 #define WUY_HTTP_STATUS_CODE_TABLE \
+	X(0, "_not_set") \
 	X(200, "OK") \
 	X(201, "Created") \
 	X(202, "Accepted") \
