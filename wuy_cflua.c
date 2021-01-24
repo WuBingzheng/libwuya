@@ -6,6 +6,7 @@
 #include <lua5.1/lauxlib.h>
 
 #include "wuy_cflua.h"
+#include "wuy_container.h"
 
 enum wuy_cflua_error {
 	WUY_CFLUA_ERR_OK = 0,
@@ -27,6 +28,13 @@ static struct wuy_cflua_stack {
 	void				*container;
 } wuy_cflua_stacks[100];
 static int wuy_cflua_stack_index = 0;
+
+/* reused container with reference count */
+struct wuy_cflua_reuse_container {
+	void	*key;
+	long	refs;
+	long	container[0];
+};
 
 static const char *wuy_cflua_post_err;
 const char *wuy_cflua_post_arg; /* set by user */
@@ -305,25 +313,28 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 		/* try to reuse the exist container */
 		lua_pushvalue(L, -1);
 		lua_gettable(L, LUA_REGISTRYINDEX);
-		void *hit = lua_touserdata(L, -1);
+		struct wuy_cflua_reuse_container *rc = lua_touserdata(L, -1);
 		lua_pop(L, 1);
-		if (hit != NULL) {
-			wuy_cflua_assign_value(cmd, container, hit);
+		if (rc != NULL) {
+			rc->refs++;
+			wuy_cflua_assign_value(cmd, container, &rc->container);
 			return 0;
 		}
 
 		/* allocate new container */
-		void *new_container = calloc(1, table->size);
-		if (new_container == NULL) {
+		rc = calloc(1, sizeof(struct wuy_cflua_reuse_container) + table->size);
+		if (rc == NULL) {
 			return WUY_CFLUA_ERR_NO_MEM;
 		}
 
-		wuy_cflua_assign_value(cmd, container, new_container);
-		container = new_container;
+		wuy_cflua_assign_value(cmd, container, &rc->container);
+		container = &rc->container;
+		rc->key = lua_touserdata(L, -1);
+		rc->refs = 1;
 
 		/* cache it for reuse later */
 		lua_pushvalue(L, -1);
-		lua_pushlightuserdata(L, container);
+		lua_pushlightuserdata(L, rc);
 		lua_settable(L, LUA_REGISTRYINDEX);
 	}
 
@@ -596,6 +607,112 @@ const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table, void *c
 }
 
 
+static void wuy_cflua_free_command(lua_State *L, struct wuy_cflua_command *cmd, void *container)
+{
+	container = (char *)container + cmd->offset;
+
+	switch (cmd->type) {
+	case WUY_CFLUA_TYPE_FUNCTION: {
+		wuy_cflua_function_t f = *(wuy_cflua_function_t *)container;
+		if (f != 0) {
+			luaL_unref(L, LUA_REGISTRYINDEX, f);
+		}
+		break;
+	}
+	case WUY_CFLUA_TYPE_STRING: {
+		char *s = *(char **)container;
+		if (s != cmd->default_value.s) {
+			free(s);
+		}
+		break;
+	}
+	case WUY_CFLUA_TYPE_TABLE:
+		if (cmd->u.table->size != 0) {
+			container = *(void **)container;
+		}
+		wuy_cflua_free(L, cmd->u.table, container);
+		break;
+	default:
+		/* not need free */;
+	}
+}
+static void wuy_cflua_free_multi_array(lua_State *L, struct wuy_cflua_command *cmd, void *container)
+{
+	void *array = *(void **)((char *)container + cmd->offset);
+	if (array == NULL) {
+		return;
+	}
+
+	switch (cmd->type) {
+	case WUY_CFLUA_TYPE_FUNCTION: {
+		wuy_cflua_function_t *pf = array;
+		while (*pf != 0) {
+			luaL_unref(L, LUA_REGISTRYINDEX, *pf++);
+		}
+		break;
+	}
+	case WUY_CFLUA_TYPE_STRING: {
+		char **ps = array;
+		while (*ps != NULL) {
+			free(*ps++);
+		}
+		break;
+	}
+	case WUY_CFLUA_TYPE_TABLE: {
+		void **pc = array;
+		while (*pc != NULL) {
+			wuy_cflua_free(L, cmd->u.table, *pc++);
+		}
+		break;
+	}
+	default:
+		/* not need free */;
+	}
+
+	free(array);
+}
+
+void wuy_cflua_free(lua_State *L, struct wuy_cflua_table *table, void *container)
+{
+	struct wuy_cflua_reuse_container *rc = NULL;
+
+	if (container == NULL) {
+		return;
+	}
+
+	if (table->size != 0) {
+		rc = wuy_containerof(container, struct wuy_cflua_reuse_container, container);
+		if (--rc->refs > 0) {
+			return;
+		}
+		lua_pushlightuserdata(L, rc->key);
+		lua_pushnil(L);
+		lua_settable(L, LUA_REGISTRYINDEX);
+	}
+
+	if (table->free != NULL) {
+		table->free(container);
+	}
+
+	struct wuy_cflua_command *cmd;
+	for (cmd = table->commands; cmd->type != WUY_CFLUA_TYPE_END; cmd++) {
+		if (cmd->name == NULL && !cmd->is_single_array) {
+			wuy_cflua_free_multi_array(L, cmd, container);
+		} else {
+			wuy_cflua_free_command(L, cmd, container);
+		}
+	}
+	if (cmd->u.next != NULL) {
+		struct wuy_cflua_command *(*next)(struct wuy_cflua_command *) = cmd->u.next;
+		while ((cmd = next(cmd)) != NULL) {
+			wuy_cflua_free_command(L, cmd, container);
+		}
+	}
+
+	free(rc);
+}
+
+
 void wuy_cflua_build_tables(lua_State *L, struct wuy_cflua_table *table)
 {
 	lua_newtable(L);
@@ -774,11 +891,9 @@ void wuy_cflua_dump_table_markdown(const struct wuy_cflua_table *table, int leve
 		wuy_cflua_dump_command_markdown(cmd, level);
 	}
 
-	int count = 0;
 	if (cmd->u.next != NULL) {
 		struct wuy_cflua_command *(*next)(struct wuy_cflua_command *) = cmd->u.next;
 		while ((cmd = next(cmd)) != NULL) {
-			if (count++ > 10) break;
 			wuy_cflua_dump_command_markdown(cmd, level);
 		}
 	}

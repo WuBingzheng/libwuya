@@ -104,6 +104,9 @@ struct wuy_cflua_table {
 	/* handler called after parsing */
 	const char *		(*post)(void *);
 
+	/* handler called for extra free action */
+	void			(*free)(void *);
+
 	/* handler for arbitrary key-value options */
 	const char *		(*arbitrary)(lua_State *, void *);
 };
@@ -111,6 +114,8 @@ struct wuy_cflua_table {
 /* return WUY_CFLUA_OK if successful, or error reason if fail */
 #define WUY_CFLUA_OK (const char *)0
 const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table, void *container);
+
+void wuy_cflua_free(lua_State *L, struct wuy_cflua_table *table, void *container);
 
 /* set by user if necessary when table's post/arbitrary hander fails */
 extern const char *wuy_cflua_post_arg;
