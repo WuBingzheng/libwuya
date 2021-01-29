@@ -55,7 +55,6 @@ struct wuy_cflua_command {
 
 	/* only for multi-member array command. */
 	off_t			array_number_offset;
-	size_t			array_member_size;
 
 	/* default values, only for key-value options, but not array members */
 	union {

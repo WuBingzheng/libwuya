@@ -218,7 +218,7 @@ static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *c
 
 	/* multi-members array.
 	 * allocate an array for the values, and assign the array to target */
-	size_t type_size = cmd->array_member_size ? cmd->array_member_size : wuy_cflua_type_size(cmd->type);
+	size_t type_size = wuy_cflua_type_size(cmd->type);
 	void *array = calloc(objlen + 1, type_size);
 	wuy_cflua_assign_value(cmd, container, array);
 
@@ -614,7 +614,7 @@ static void wuy_cflua_free_command(lua_State *L, struct wuy_cflua_command *cmd, 
 	switch (cmd->type) {
 	case WUY_CFLUA_TYPE_FUNCTION: {
 		wuy_cflua_function_t f = *(wuy_cflua_function_t *)container;
-		if (f != 0) {
+		if (f != 0 && f != cmd->default_value.f) {
 			luaL_unref(L, LUA_REGISTRYINDEX, f);
 		}
 		break;
@@ -629,6 +629,9 @@ static void wuy_cflua_free_command(lua_State *L, struct wuy_cflua_command *cmd, 
 	case WUY_CFLUA_TYPE_TABLE:
 		if (cmd->u.table->size != 0) {
 			container = *(void **)container;
+			if (container == cmd->default_value.t) {
+				container = NULL;
+			}
 		}
 		wuy_cflua_free(L, cmd->u.table, container);
 		break;
@@ -640,6 +643,9 @@ static void wuy_cflua_free_multi_array(lua_State *L, struct wuy_cflua_command *c
 {
 	void *array = *(void **)((char *)container + cmd->offset);
 	if (array == NULL) {
+		return;
+	}
+	if (array == cmd->default_value.p) {
 		return;
 	}
 
