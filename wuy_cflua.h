@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <lua5.1/lua.h>
 
+#include "wuy_pool.h"
+
 /* `type` in `struct wuy_cflua_command` */
 enum wuy_cflua_type {
 	WUY_CFLUA_TYPE_END = 0,
@@ -112,9 +114,8 @@ struct wuy_cflua_table {
 
 /* return WUY_CFLUA_OK if successful, or error reason if fail */
 #define WUY_CFLUA_OK (const char *)0
-const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table, void *container);
-
-void wuy_cflua_free(lua_State *L, struct wuy_cflua_table *table, void *container);
+const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table,
+		void *container, wuy_pool_t *pool);
 
 /* set by user if necessary when table's post/arbitrary hander fails */
 extern const char *wuy_cflua_post_arg;
