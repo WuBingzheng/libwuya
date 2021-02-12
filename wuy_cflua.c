@@ -37,7 +37,11 @@ const char *wuy_cflua_arbitrary_arg; /* set by user */
 
 static struct wuy_cflua_command	*wuy_cflua_current_cmd;
 
-static wuy_pool_t *wuy_cflua_pool;
+/* Put it here because we do not want to add this parameter for almost
+ * every functions, because this is not related to the parsing.
+ * Extern it out because we do not want to add this parameter
+ * for handlers in struct wuy_cflua_table, for the same reason. */
+wuy_pool_t *wuy_cflua_pool;
 
 #define WUY_CFLUA_PINT(container, offset)	*(int *)((char *)(container) + offset)
 
@@ -627,7 +631,10 @@ const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table,
 
 	wuy_cflua_stack_index = 0;
 	wuy_cflua_pool = pool;
+
 	int ret = wuy_cflua_set_table(L, &tmp, container);
+
+	wuy_cflua_pool = NULL;
 
 	return wuy_cflua_strerror(L, ret);
 }

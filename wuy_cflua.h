@@ -117,6 +117,9 @@ struct wuy_cflua_table {
 const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table,
 		void *container, wuy_pool_t *pool);
 
+/* could be used by handlers in struct wuy_cflua_table */
+extern wuy_pool_t *wuy_cflua_pool;
+
 /* set by user if necessary when table's post/arbitrary hander fails */
 extern const char *wuy_cflua_post_arg;
 extern const char *wuy_cflua_arbitrary_arg;
