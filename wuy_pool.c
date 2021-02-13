@@ -50,6 +50,7 @@ void wuy_pool_release(wuy_pool_t *pool)
 		next = block->next;
 		free(block);
 	}
+	free(pool);
 }
 
 static struct wuy_pool_block *wuy_pool_block_new(wuy_pool_t *pool)
