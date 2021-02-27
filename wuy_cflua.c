@@ -492,7 +492,7 @@ static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *
 	case WUY_CFLUA_TYPE_TABLE:
 		if (cmd->default_value.t != NULL) {
 			wuy_cflua_assign_value(cmd, container, cmd->default_value.t);
-		} else {
+		} else if (cmd->name != NULL) {
 			lua_newtable(L);
 			wuy_cflua_set_table(L, cmd, container);
 			lua_pop(L, 1);
