@@ -111,9 +111,9 @@ struct wuy_shmpool *wuy_shmpool_new(const char *name, size_t small_size,
 	return pool;
 }
 
-void wuy_shmpool_release(struct wuy_shmpool *pool)
+void wuy_shmpool_destroy(struct wuy_shmpool *pool)
 {
-	_debug("wuy_shmpool: release pool %s\n", pool->name);
+	_debug("wuy_shmpool: destroy pool %s\n", pool->name);
 
 	shm_unlink(pool->name);
 	munmap(pool->small_buffer, pool->small_size);
@@ -190,6 +190,6 @@ void wuy_shmpool_cleanup(void)
 {
 	struct wuy_shmpool *pool;
 	while (wuy_list_pop_type(&wuy_shmpool_head, pool, list_node)) {
-		wuy_shmpool_release(pool);
+		wuy_shmpool_destroy(pool);
 	}
 }

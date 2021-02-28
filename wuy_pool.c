@@ -35,7 +35,7 @@ wuy_pool_t *wuy_pool_new(size_t block_size)
 	return pool;
 }
 
-void wuy_pool_release(wuy_pool_t *pool)
+void wuy_pool_destroy(wuy_pool_t *pool)
 {
 	for (struct wuy_pool_free *fr = pool->free_head; fr != NULL; fr = fr->next) {
 		fr->handler(fr->data);

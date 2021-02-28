@@ -8,19 +8,24 @@ static lua_State *wuy_luastr_L = NULL;
 
 static void wuy_luastr_init(void)
 {
+	printf("wuy_luastr_init\n");
 	if (wuy_luastr_L == NULL) {
 		return;
 	}
 	wuy_luastr_L = lua_open();
 	luaL_openlibs(wuy_luastr_L);
+	printf(" 1\n");
 	lua_getglobal(wuy_luastr_L, "string");
+	printf(" 2\n");
 }
 
 const char *wuy_luastr_gsub(const char *s, const char *pattern, const char *repl)
 {
 	wuy_luastr_init();
 
+	printf("before %d\n", lua_gettop(wuy_luastr_L));
 	lua_getfield(wuy_luastr_L, -1, "gsub");
+	printf("after %d\n", lua_gettop(wuy_luastr_L));
 
 	lua_pushstring(wuy_luastr_L, s);
 	lua_pushstring(wuy_luastr_L, pattern);
@@ -42,7 +47,9 @@ bool wuy_luastr_find(const char *s, const char *pattern)
 {
 	wuy_luastr_init();
 
+	printf("before %d\n", lua_gettop(wuy_luastr_L));
 	lua_getfield(wuy_luastr_L, -1, "find");
+	printf("after %d\n", lua_gettop(wuy_luastr_L));
 
 	lua_pushstring(wuy_luastr_L, s);
 	lua_pushstring(wuy_luastr_L, pattern);

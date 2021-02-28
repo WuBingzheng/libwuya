@@ -5,7 +5,7 @@ typedef struct wuy_pool wuy_pool_t;
 
 wuy_pool_t *wuy_pool_new(size_t block_size);
 
-void wuy_pool_release(wuy_pool_t *pool);
+void wuy_pool_destroy(wuy_pool_t *pool);
 
 void *wuy_pool_alloc_align(wuy_pool_t *pool, size_t size, size_t align);
 
