@@ -422,14 +422,29 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 	return 0;
 }
 
+static bool wuy_cflua_type_equal(int tvalue, enum wuy_cflua_type tcmd)
+{
+	return tvalue == tcmd || (tvalue == LUA_TNUMBER && tcmd == WUY_CFLUA_TYPE_INTEGER);
+}
 static bool wuy_cflua_check_type(lua_State *L, struct wuy_cflua_command *cmd)
 {
 	int type = lua_type(L, -1);
-	if (type == cmd->type) {
+	if (wuy_cflua_type_equal(type, cmd->type)) {
 		return true;
 	}
-	if (type == LUA_TNUMBER && cmd->type == WUY_CFLUA_TYPE_INTEGER) {
-		return true;
+
+	if (cmd->type == WUY_CFLUA_TYPE_TABLE) {
+		/* grammar suger: for the table value with only one array member,
+		 * the table can be ommited */
+		struct wuy_cflua_command *c0 = &cmd->u.table->commands[0];
+		if (c0->name == NULL && wuy_cflua_type_equal(type, c0->type)) {
+			/* create a table to include and replace the value */
+			lua_newtable(L);
+			lua_pushvalue(L, -2); /* the value */
+			lua_rawseti(L, -2, 1);
+			lua_replace(L, -2);
+			return true;
+		}
 	}
 	return false;
 }
