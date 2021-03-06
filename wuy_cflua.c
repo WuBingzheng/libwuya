@@ -335,6 +335,10 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 	if (table->size == 0) { /* use this container with offset */
 		container = (char *)container + cmd->offset;
 
+		if (table->free != NULL) {
+			wuy_pool_add_free(wuy_cflua_pool, table->free, container);
+		}
+
 	} else { /* reuse or allocate new container */
 
 		/* try to reuse the exist container */
@@ -424,7 +428,10 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 
 static bool wuy_cflua_type_equal(int tvalue, enum wuy_cflua_type tcmd)
 {
-	return tvalue == tcmd || (tvalue == LUA_TNUMBER && tcmd == WUY_CFLUA_TYPE_INTEGER);
+	if (tcmd == WUY_CFLUA_TYPE_INTEGER) {
+		tcmd = LUA_TNUMBER;
+	}
+	return tvalue == tcmd;
 }
 static bool wuy_cflua_check_type(lua_State *L, struct wuy_cflua_command *cmd)
 {
