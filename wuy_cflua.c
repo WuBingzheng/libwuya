@@ -335,10 +335,6 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 	if (table->size == 0) { /* use this container with offset */
 		container = (char *)container + cmd->offset;
 
-		if (table->free != NULL) {
-			wuy_pool_add_free(wuy_cflua_pool, table->free, container);
-		}
-
 	} else { /* reuse or allocate new container */
 
 		/* try to reuse the exist container */
@@ -357,10 +353,6 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 			return WUY_CFLUA_ERR_NO_MEM;
 		}
 
-		if (table->free != NULL) {
-			wuy_pool_add_free(wuy_cflua_pool, table->free, new_container);
-		}
-
 		wuy_cflua_assign_value(cmd, container, new_container);
 		container = new_container;
 
@@ -376,6 +368,9 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 
 	if (table->init != NULL) {
 		table->init(container);
+	}
+	if (table->free != NULL) {
+		wuy_pool_add_free(wuy_cflua_pool, table->free, container);
 	}
 
 	/* walk through table->commands against config */
@@ -420,6 +415,7 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 			wuy_cflua_post_err = err;
 			return WUY_CFLUA_ERR_POST;
 		}
+
 	}
 
 	wuy_cflua_stack_index--;
