@@ -71,6 +71,15 @@ static int wuy_event_do_del(int epfd, int fd)
 	return wuy_event_op(epfd, fd, EPOLL_CTL_DEL, 0, NULL);
 }
 
+int wuy_event_add_listen(wuy_event_ctx_t *ctx, int fd, void *data)
+{
+	uint32_t op = EPOLLIN;
+#ifdef EPOLLEXCLUSIVE
+	op |= EPOLLEXCLUSIVE
+#endif
+	return wuy_event_op(ctx->fd, fd, EPOLL_CTL_ADD, op, data);
+}
+
 int wuy_event_add_read(wuy_event_ctx_t *ctx, int fd, void *data,
 		wuy_event_status_t *status)
 {
