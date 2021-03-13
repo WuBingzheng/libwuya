@@ -39,6 +39,9 @@ enum wuy_http_method {
 	X(405, "Method Not Allowed") \
 	X(406, "Not Acceptable") \
 	X(408, "Request Timeout") \
+	X(411, "Length Required") \
+	X(413, "Payload Too Large") \
+	X(414, "URI Too Long") \
 	X(416, "Range Not Satisfiable") \
 	X(500, "Internal Server Error") \
 	X(502, "Bad Gateway") \
