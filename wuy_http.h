@@ -114,12 +114,21 @@ int wuy_http_header(const char *buf, int len, int *out_name_len,
 		const char **out_value_start, int *out_value_len);
 
 int wuy_http_uri(const char *uri, int len, const char **p_host,
-		const char **p_path, const char **p_query, const char **p_fragment);
+		const char **p_path, const char **p_query);
 
 int wuy_http_decode_path(char *dest, const char *src, int len);
 
 int wuy_http_uri_query_get(const char *query_str, int query_len,
 		const char *key_str, int key_len, char *value_buf);
+
+int wuy_http_uri_query_first(const char *query_str, int query_len,
+		int *p_key_len, char *value_buf, int *p_value_len);
+
+int wuy_http_decode_query_value(char *dest, const char *src, int len);
+
+int wuy_http_encode_query(const char *key_str, int key_len,
+		const char *value_str, int value_len,
+		char *out_buffer, int out_buf_size);
 
 typedef struct {
 	int	state;
