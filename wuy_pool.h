@@ -17,7 +17,7 @@ void wuy_pool_add_free(wuy_pool_t *pool, void (*handler)(void *), void *data);
 
 
 #include <string.h>
-static inline char *wuy_pool_strndup(wuy_pool_t *pool, const char *s, int len)
+static inline void *wuy_pool_strndup(wuy_pool_t *pool, const char *s, int len)
 {
 	char *d = wuy_pool_alloc_align(pool, len + 1, 1);
 	return memcpy(d, s, len);

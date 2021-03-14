@@ -156,7 +156,7 @@ static inline wuy_slist_node_t *wuy_slist_pop(wuy_slist_t *list)
 #define wuy_slist_iter_prev_type(list, p, member, pprev) \
 	for (pprev = &((list)->first); \
 			p = wuy_containerof(*pprev, typeof(*p), member), *pprev != NULL; \
-			pprev = (*pprev == node) ? &(node->next) : pprev)
+			pprev = (*pprev == &p->member) ? &(p->member.next) : pprev)
 
 /**
  * @brief Delete node from its list.
