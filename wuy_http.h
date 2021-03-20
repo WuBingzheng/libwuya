@@ -114,7 +114,7 @@ int wuy_http_header(const char *buf, int len, int *out_name_len,
 		const char **out_value_start, int *out_value_len);
 
 int wuy_http_uri(const char *uri, int len, const char **p_host,
-		const char **p_path, const char **p_query);
+		const char **p_path, const char **p_query, const char **p_fragment);
 
 int wuy_http_decode_path(char *dest, const char *src, int len);
 

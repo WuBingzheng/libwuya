@@ -3,6 +3,7 @@
 #define _GNU_SOURCE // memrchr()
 #include <stdio.h>
 #include <time.h>
+#include <ctype.h>
 #include <string.h>
 
 #include "wuy_http.h"
@@ -187,14 +188,24 @@ int wuy_http_encode_query(const char *key_str, int key_len,
 		}
 
 		char c = value_str[i];
-		*p++ = c;
+		if (isalnum(c) || c=='-' || c=='.' || c=='_' || c=='~') {
+			*p++ = c;
+		} else if (c == ' ') {
+			*p++ = '+';
+		} else {
+			*p++ = '%';
+			int high = (unsigned char)c >> 4;
+			int low = c & 0xF;
+			*p++ = high < 10 ? high + '0' : high + 'A' - 10;
+			*p++ = low < 10 ? low + '0' : low + 'A' - 10;
+		}
 	}
 
 	return p - out_buffer;
 }
 
 int wuy_http_uri(const char *uri, int len, const char **p_host,
-		const char **p_path, const char **p_query)
+		const char **p_path, const char **p_query, const char **p_fragment)
 {
 	if (len == 0) {
 		return WUY_HTTP_ERROR;
@@ -208,6 +219,7 @@ int wuy_http_uri(const char *uri, int len, const char **p_host,
 		*p_path = uri;
 		*p_host = NULL;
 		*p_query = NULL;
+		*p_fragment = NULL;
 		return 1;
 	}
 	
@@ -250,6 +262,18 @@ int wuy_http_uri(const char *uri, int len, const char **p_host,
 		*p_query = p;
 	} else {
 		*p_query = NULL;
+	}
+
+	/* URI: optional fragment */
+	stop = memchr(p, '#', end - p);
+	if (stop != NULL) {
+		if (path_len == 0) {
+			path_len = stop - p;
+		}
+		p = stop;
+		*p_fragment = p;
+	} else {
+		*p_fragment = NULL;
 	}
 
 	if (path_len == 0) {
