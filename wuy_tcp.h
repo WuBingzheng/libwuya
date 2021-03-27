@@ -137,7 +137,7 @@ static inline int wuy_tcp_connect(struct sockaddr *sa)
 	}
 
 	errno = 0;
-	int ret = connect(fd, sa, sizeof(struct sockaddr));
+	int ret = connect(fd, sa, wuy_sockaddr_size(sa));
 	if (ret < 0 && errno != EINPROGRESS) {
 		close(fd);
 		return -1;
