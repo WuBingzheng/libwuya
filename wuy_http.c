@@ -476,7 +476,7 @@ enum wuy_http_chunked_state {
 	WUY_HTTP_CHUNKED_FINISH,
 };
 
-static int wuy_http_chunked_size(wuy_http_chunked_t *chunked, const char *buf, int len)
+static int wuy_http_chunked_size(wuy_http_chunked_t *chunked, const void *buf, int len)
 {
 	const char *end = buf + len;
 	const char *p = buf;
@@ -503,76 +503,68 @@ static int wuy_http_chunked_size(wuy_http_chunked_t *chunked, const char *buf, i
 	}
 
 	chunked->size = n;
-	return p - buf;
+	return p - (const char *)buf;
 }
 
-#define MIN3(a, b, c) (a)<(b) ? ((a)<(c)?(a):(c)) : ((b)<(c)?(b):(c))
-int wuy_http_chunked_process(wuy_http_chunked_t *chunked, const uint8_t *in_buf,
-		int in_len, uint8_t *out_buf, int *p_out_len)
+int wuy_http_chunked_decode(wuy_http_chunked_t *chunked, const uint8_t **p_buffer,
+		const uint8_t *buf_end)
 {
-	const uint8_t *in_pos = in_buf;
-	uint8_t *out_pos = out_buf;
-	int out_len = *p_out_len;
+	const uint8_t *p = *p_buffer;
 
-	while (in_len > 0 && out_len > 0) {
+	while (p < buf_end) {
 		int proc_len;
 		switch (chunked->state) {
 		case WUY_HTTP_CHUNKED_DISABLE:
 			return -3;
 		case WUY_HTTP_CHUNKED_HEADER:
-			proc_len = wuy_http_chunked_size(chunked, (const char *)in_pos, in_len);
+			proc_len = wuy_http_chunked_size(chunked, p, buf_end - p);
 			if (proc_len < 0) {
 				return -4;
 			}
+			p += proc_len;
 			break;
 		case WUY_HTTP_CHUNKED_HEADER_TAIL_LF:
-			if (in_pos[0] != '\n') {
+			if (p[0] != '\n') {
 				return -5;
 			}
-			proc_len = 1;
+			p += 1;
 			chunked->state = (chunked->size != 0) ? WUY_HTTP_CHUNKED_BODY : WUY_HTTP_CHUNKED_FINISH;
 			break;
 		case WUY_HTTP_CHUNKED_BODY:
-			proc_len = MIN3(chunked->size, in_len, out_len);
-			memcpy(out_pos, in_pos, proc_len);
-			out_pos += proc_len;
-			out_len -= proc_len;
-			chunked->size -= proc_len;
-			if (chunked->size == 0) {
+			if (chunked->size <= buf_end - p) {
+				buf_end = p + chunked->size;
 				chunked->state = WUY_HTTP_CHUNKED_BODY_TAIL_CR;
 			}
-			break;
+			chunked->size -= buf_end - p;
+			*p_buffer = p;
+			return buf_end - p;
 		case WUY_HTTP_CHUNKED_BODY_TAIL_CR:
-			if (in_pos[0] != '\r') {
+			if (p[0] != '\r') {
 				return -6;
 			}
-			proc_len = 1;
+			p += 1;
 			chunked->state = WUY_HTTP_CHUNKED_BODY_TAIL_LF;
 			break;
 		case WUY_HTTP_CHUNKED_BODY_TAIL_LF:
-			if (in_pos[0] != '\n') {
+			if (p[0] != '\n') {
 				return -7;
 			}
-			proc_len = 1;
+			p += 1;
 			chunked->state = WUY_HTTP_CHUNKED_HEADER;
 			break;
 		case WUY_HTTP_CHUNKED_FINISH:
-			if (in_pos[0] != '\r' && in_pos[0] != '\n') {
-				goto out;
+			if (p[0] != '\r' && p[0] != '\n') {
+				return -8;
 			}
-			proc_len = 1;
+			p += 1;
 			break;
 		default:
-			return -8;
+			return -9;
 		}
-
-		in_pos += proc_len;
-		in_len -= proc_len;
 	}
 
-out:
-	*p_out_len = out_pos - out_buf;
-	return in_pos - in_buf;
+	*p_buffer = p;
+	return 0;
 }
 
 void wuy_http_chunked_init(wuy_http_chunked_t *chunked)

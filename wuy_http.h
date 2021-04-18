@@ -135,8 +135,8 @@ typedef struct {
 	int	size;
 } wuy_http_chunked_t;
 
-int wuy_http_chunked_process(wuy_http_chunked_t *chunked, const uint8_t *in_buf,
-		int in_len, uint8_t *out_buf, int *p_out_len);
+int wuy_http_chunked_decode(wuy_http_chunked_t *chunked, const uint8_t **p_buffer,
+		const uint8_t *buf_end);
 
 void wuy_http_chunked_init(wuy_http_chunked_t *chunked);
 void wuy_http_chunked_enable(wuy_http_chunked_t *chunked);
