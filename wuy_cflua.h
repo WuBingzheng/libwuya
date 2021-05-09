@@ -31,8 +31,6 @@ struct wuy_cflua_command {
 	/* is single array member? */
 	bool			is_single_array;
 
-	bool			is_extra_commands;
-
 	enum wuy_cflua_type	type;
 
 	/* offset of target member in container. */
@@ -52,14 +50,17 @@ struct wuy_cflua_command {
 
 	/* -- OPTIONAL -- */
 
-	/* offset of meta_level(int) */
-	off_t			meta_level_offset;
-
 	/* only for multi-member array command. */
 	off_t			array_number_offset;
 
+	/* offset of default-values-container to inherit for multi-array-members */
+	off_t			inherit_container_offset;
+
+	/* offset of inherit count(int) */
+	off_t			inherit_count_offset;
+
 	/* default values, only for key-value options, but not array members */
-	union {
+	union wuy_cflua_default_value {
 		bool			b;
 		int			n;
 		double			d;
@@ -94,6 +95,9 @@ struct wuy_cflua_table {
 	 * If set 0, do not allocate new container and use the current container. */
 	unsigned		size;
 
+	/* omit if not set */
+	bool			is_omit;
+
 	/* print the table's name, for wuy_cflua_strerror() to print table-stack.
 	 * If this is not set and command->name is set (not array member command),
 	 * command->name is used. Otherwise "{?}" is used. */
@@ -115,7 +119,7 @@ struct wuy_cflua_table {
 /* return WUY_CFLUA_OK if successful, or error reason if fail */
 #define WUY_CFLUA_OK (const char *)0
 const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table,
-		void *container, wuy_pool_t *pool);
+		void *container, wuy_pool_t *pool, const void *inherit_from);
 
 /* could be used by handlers in struct wuy_cflua_table */
 extern wuy_pool_t *wuy_cflua_pool;

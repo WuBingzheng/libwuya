@@ -8,6 +8,9 @@
 #include "wuy_pool.h"
 #include "wuy_cflua.h"
 
+// #define _debug printf
+#define _debug(...)
+
 enum wuy_cflua_error {
 	WUY_CFLUA_ERR_OK = 0,
 	WUY_CFLUA_ERR_NO_MEM,
@@ -129,8 +132,12 @@ static int wuy_cflua_set_double(lua_State *L, struct wuy_cflua_command *cmd, voi
 	return 0;
 }
 
-static int wuy_cflua_set_types(lua_State *L, struct wuy_cflua_command *cmd, void *container);
-static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *cmd, void *container);
+static int wuy_cflua_set_types(lua_State *L, struct wuy_cflua_command *cmd,
+		void *container, const void *inherit_from);
+static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *cmd,
+		void *container, const void *inherit_from);
+static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd,
+		void *container, const void *inherit_from, bool is_inherit);
 
 static size_t wuy_cflua_type_size(enum wuy_cflua_type type)
 {
@@ -170,7 +177,7 @@ static int wuy_cflua_valid_command(lua_State *L, struct wuy_cflua_table *table, 
 				if (strcmp(cmd->name, name) == 0) {
 					return 0;
 				}
-			} else if (cmd->is_extra_commands) {
+			} else if (cmd->inherit_container_offset != 0) {
 				assert(cmd->type == WUY_CFLUA_TYPE_TABLE);
 				if (wuy_cflua_valid_command(L, cmd->u.table, container) == 0) {
 					return 0;
@@ -204,30 +211,29 @@ static int wuy_cflua_valid_command(lua_State *L, struct wuy_cflua_table *table, 
 	return 0;
 }
 
-static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *cmd, void *container)
+static int wuy_cflua_array_inherit_default(lua_State *L, struct wuy_cflua_command *cmd,
+		void *container, const void *inherit_from)
 {
-	if (lua_isnil(L, -1)) {
-		wuy_cflua_set_default_value(L, cmd, container);
+	_debug("  == array inherit: %ld\n", cmd->inherit_container_offset);
+
+	assert(cmd->name == NULL && !cmd->is_single_array);
+	assert(cmd->type == WUY_CFLUA_TYPE_TABLE);
+	assert(cmd->inherit_container_offset != 0);
+
+	void *inherit_container = (char *)container + cmd->inherit_container_offset - cmd->offset;
+	int ret = wuy_cflua_set_table(L, cmd, inherit_container, inherit_from, true);
+	_debug("  == end of inherit: %ld\n", cmd->inherit_container_offset);
+	return ret;
+}
+
+static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *cmd,
+		void *container, const void *inherit_from)
+{
+	size_t objlen = lua_objlen(L, -1);
+	if (objlen == 0) {
+		wuy_cflua_set_default_value(L, cmd, container, inherit_from);
 		return 0;
 	}
-
-	/* find the real table */
-	size_t objlen;
-	int meta_level = 0;
-	while ((objlen = lua_objlen(L, -1)) == 0) {
-		if (!lua_getmetatable(L, -1)) {
-			wuy_cflua_set_default_value(L, cmd, container);
-			lua_pop(L, meta_level);
-			return 0;
-		}
-
-		meta_level++;
-		if (meta_level > 10) {
-			return WUY_CFLUA_ERR_TOO_DEEP_META;
-		}
-	}
-
-	/* OK, now let's read the array members */
 
 	/* unique-member, just assign the single value */
 	if (cmd->is_single_array) {
@@ -235,16 +241,27 @@ static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *c
 			return WUY_CFLUA_ERR_DEPLICATE_MEMBER;
 		}
 		lua_rawgeti(L, -1, 1);
-		int ret = wuy_cflua_set_types(L, cmd, container);
+		int ret = wuy_cflua_set_types(L, cmd, container, inherit_from);
 		if (ret != 0) {
 			return ret;
 		}
 		lua_pop(L, 1);
-		goto out;
+		return 0;
 	}
 
-	/* multi-members array.
-	 * allocate an array for the values, and assign the array to target */
+	/* multi-members array */
+
+	/* parse default value if necessary */
+	const char *array_member_inherit_from = NULL;
+	if (cmd->inherit_container_offset != 0) {
+		int ret = wuy_cflua_array_inherit_default(L, cmd, container, inherit_from);
+		if (ret != 0) {
+			return ret;
+		}
+		array_member_inherit_from = (char *)container + cmd->inherit_container_offset;
+	}
+
+	/* allocate an array for the values, and assign the array to target */
 	size_t type_size = wuy_cflua_type_size(cmd->type);
 	void *array = wuy_pool_alloc(wuy_cflua_pool, (objlen + 1) * type_size);
 	wuy_cflua_assign_value(cmd, container, array);
@@ -260,7 +277,7 @@ static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *c
 			lua_pop(L, 1);
 			break;
 		}
-		int ret = wuy_cflua_set_types(L, &fake, array);
+		int ret = wuy_cflua_set_types(L, &fake, array, array_member_inherit_from - fake.offset);
 		if (ret != 0) {
 			return ret;
 		}
@@ -271,80 +288,53 @@ static int wuy_cflua_set_array_members(lua_State *L, struct wuy_cflua_command *c
 	if (cmd->array_number_offset != 0) {
 		WUY_CFLUA_PINT(container, cmd->array_number_offset) = objlen;
 	}
-out:
-	if (cmd->meta_level_offset != 0) {
-		WUY_CFLUA_PINT(container, cmd->meta_level_offset) = meta_level;
-	}
-
-	if (meta_level > 0) {
-		lua_pop(L, meta_level);
-	}
 	return 0;
 }
 
-static int wuy_cflua_set_option(lua_State *L, struct wuy_cflua_command *cmd, void *container)
+static int wuy_cflua_set_option(lua_State *L, struct wuy_cflua_command *cmd,
+		void *container, const void *inherit_from)
 {
-	if (lua_isnil(L, -1)) {
-		wuy_cflua_set_default_value(L, cmd, container);
-		return 0;
-	}
-
 	lua_getfield(L, -1, cmd->name);
 	if (lua_isnil(L, -1)) {
-		wuy_cflua_set_default_value(L, cmd, container);
+		wuy_cflua_set_default_value(L, cmd, container, inherit_from);
 		lua_pop(L, 1);
 		return 0;
 	}
 
-	int ret = wuy_cflua_set_types(L, cmd, container);
+	int ret = wuy_cflua_set_types(L, cmd, container, inherit_from);
 	if (ret != 0) {
 		return ret;
 	}
 	lua_pop(L, 1);
-
-	/* calculate meta_level */
-	if (cmd->meta_level_offset != 0) {
-		int meta_level = 0;
-		while (1) {
-			lua_pushstring(L, cmd->name);
-			lua_rawget(L, -2);
-			if (!lua_isnil(L, -1)) {
-				lua_pop(L, 1);
-				break;
-			}
-			lua_pop(L, 1);
-
-			meta_level++;
-			lua_getmetatable(L, -1);
-		}
-		if (meta_level > 0) {
-			lua_pop(L, meta_level);
-		}
-
-		WUY_CFLUA_PINT(container, cmd->meta_level_offset) = meta_level;
-	}
-
 	return 0;
 }
 
-static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void *container)
+static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd,
+		void *container, const void *inherit_from, bool is_inherit)
 {
-	struct wuy_cflua_table *table = cmd->u.table;
-	const char *name = cmd->name;
+	_debug("%d: set table of %s\n", wuy_cflua_stack_index, cmd->name);
 
+	struct wuy_cflua_table *table = cmd->u.table;
+
+	/* make new container */
 	if (table->size == 0) { /* use this container with offset */
 		container = (char *)container + cmd->offset;
+		if (inherit_from != NULL) {
+			inherit_from = (const char *)inherit_from + cmd->offset;
+		}
 
 	} else { /* reuse or allocate new container */
 
 		/* try to reuse the exist container */
-		lua_pushvalue(L, -1);
-		lua_gettable(L, LUA_REGISTRYINDEX);
-		void *hit = lua_touserdata(L, -1);
-		lua_pop(L, 1);
-		if (hit != NULL) {
-			wuy_cflua_assign_value(cmd, container, hit);
-			return 0;
+		if (!is_inherit) {
+			lua_pushvalue(L, -1);
+			lua_gettable(L, LUA_REGISTRYINDEX);
+			void *hit = lua_touserdata(L, -1);
+			lua_pop(L, 1);
+			if (hit != NULL) {
+				wuy_cflua_assign_value(cmd, container, hit);
+				return 0;
+			}
 		}
 
 		/* allocate new container */
@@ -357,9 +347,15 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 		container = new_container;
 
 		/* cache it for reuse later */
-		lua_pushvalue(L, -1);
-		lua_pushlightuserdata(L, container);
-		lua_settable(L, LUA_REGISTRYINDEX);
+		if (!is_inherit) {
+			lua_pushvalue(L, -1);
+			lua_pushlightuserdata(L, container);
+			lua_settable(L, LUA_REGISTRYINDEX);
+		}
+
+		if (inherit_from != NULL) {
+			inherit_from = *(const void **)((const char *)inherit_from + cmd->offset);
+		}
 	}
 
 	wuy_cflua_stacks[wuy_cflua_stack_index].cmd = cmd->real ? cmd->real : cmd;
@@ -376,10 +372,15 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 	/* walk through table->commands against config */
 	for (cmd = table->commands; cmd->type != WUY_CFLUA_TYPE_END; cmd++) {
 		int ret;
-		if (cmd->name == NULL) {
-			ret = wuy_cflua_set_array_members(L, cmd, container);
-		} else {
-			ret = wuy_cflua_set_option(L, cmd, container);
+		if (cmd->name != NULL) {
+			_debug(" .option:%s\n", cmd->name);
+			ret = wuy_cflua_set_option(L, cmd, container, inherit_from);
+		} else if (!is_inherit) {
+			_debug(" .array\n");
+			ret = wuy_cflua_set_array_members(L, cmd, container, inherit_from);
+		} else if (cmd->inherit_container_offset != 0) {
+			_debug(" .inherit of inherit\n");
+			ret = wuy_cflua_array_inherit_default(L, cmd, container, inherit_from);
 		}
 		if (ret != 0) {
 			return ret;
@@ -388,7 +389,7 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 	if (cmd->u.next != NULL) {
 		struct wuy_cflua_command *(*next)(struct wuy_cflua_command *) = cmd->u.next;
 		while ((cmd = next(cmd)) != NULL) {
-			int ret = wuy_cflua_set_option(L, cmd, container);
+			int ret = wuy_cflua_set_option(L, cmd, container, inherit_from);
 			if (ret != 0) {
 				return ret;
 			}
@@ -396,7 +397,7 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 	}
 
 	/* walk through config against table->commands to validate, only if non-internal */
-	if (name == NULL || name[0] != '_') {
+	if (!is_inherit) {
 		lua_pushnil(L);
 		while (lua_next(L, -2) != 0) {
 			int ret = wuy_cflua_valid_command(L, table, container);
@@ -415,10 +416,10 @@ static int wuy_cflua_set_table(lua_State *L, struct wuy_cflua_command *cmd, void
 			wuy_cflua_post_err = err;
 			return WUY_CFLUA_ERR_POST;
 		}
-
 	}
 
 	wuy_cflua_stack_index--;
+	_debug("%d: end\n", wuy_cflua_stack_index);
 	return 0;
 }
 
@@ -451,7 +452,8 @@ static bool wuy_cflua_check_type(lua_State *L, struct wuy_cflua_command *cmd)
 	}
 	return false;
 }
-static int wuy_cflua_set_types(lua_State *L, struct wuy_cflua_command *cmd, void *container)
+static int wuy_cflua_set_types(lua_State *L, struct wuy_cflua_command *cmd,
+		void *container, const void *inherit_from)
 {
 	wuy_cflua_current_cmd = cmd;
 
@@ -471,48 +473,57 @@ static int wuy_cflua_set_types(lua_State *L, struct wuy_cflua_command *cmd, void
 	case WUY_CFLUA_TYPE_FUNCTION:
 		return wuy_cflua_set_function(L, cmd, container);
 	case WUY_CFLUA_TYPE_TABLE:
-		return wuy_cflua_set_table(L, cmd, container);
+		return wuy_cflua_set_table(L, cmd, container, inherit_from, false);
 	default:
 		abort();
 	}
 }
 
-static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *cmd, void *container)
+static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *cmd,
+		void *container, const void *inherit_from)
 {
-	if (cmd->meta_level_offset != 0) {
-		WUY_CFLUA_PINT(container, cmd->meta_level_offset) = -1;
+	union wuy_cflua_default_value *default_value = &cmd->default_value;
+	int inherit_count = -1;
+	if (inherit_from != NULL) {
+		_debug("  ! inherit %s\n", cmd->name);
+		default_value = (void *)((char *)inherit_from + cmd->offset);
+		inherit_count = WUY_CFLUA_PINT(inherit_from, cmd->inherit_count_offset) + 1;
+	}
+
+	if (cmd->inherit_count_offset != 0) {
+		WUY_CFLUA_PINT(container, cmd->inherit_count_offset) = inherit_count;
 	}
 
 	if (cmd->name == NULL && !cmd->is_single_array) {
-		wuy_cflua_assign_value(cmd, container, cmd->default_value.p);
+		wuy_cflua_assign_value(cmd, container, default_value->p);
 		return;
 	}
 
 	switch (cmd->type) {
 	case WUY_CFLUA_TYPE_BOOLEAN:
-		wuy_cflua_assign_value(cmd, container, cmd->default_value.b);
+		wuy_cflua_assign_value(cmd, container, default_value->b);
 		return;
 	case WUY_CFLUA_TYPE_INTEGER:
-		wuy_cflua_assign_value(cmd, container, cmd->default_value.n);
+		wuy_cflua_assign_value(cmd, container, default_value->n);
 		return;
 	case WUY_CFLUA_TYPE_DOUBLE:
-		wuy_cflua_assign_value(cmd, container, cmd->default_value.d);
+		wuy_cflua_assign_value(cmd, container, default_value->d);
 		return;
 	case WUY_CFLUA_TYPE_STRING:
-		wuy_cflua_assign_value(cmd, container, cmd->default_value.s);
-		if (cmd->u.length_offset != 0 && cmd->default_value.s != NULL) {
-			WUY_CFLUA_PINT(container, cmd->u.length_offset) = strlen(cmd->default_value.s);
+		wuy_cflua_assign_value(cmd, container, default_value->s);
+		if (cmd->u.length_offset != 0 && default_value->s != NULL) {
+			WUY_CFLUA_PINT(container, cmd->u.length_offset) = strlen(default_value->s);
 		}
 		return;
 	case WUY_CFLUA_TYPE_FUNCTION:
-		wuy_cflua_assign_value(cmd, container, cmd->default_value.f);
+		wuy_cflua_assign_value(cmd, container, default_value->f);
 		return;
 	case WUY_CFLUA_TYPE_TABLE:
-		if (cmd->default_value.t != NULL) {
-			wuy_cflua_assign_value(cmd, container, cmd->default_value.t);
-		} else if (cmd->name != NULL) {
+		if (default_value->t != NULL) {
+			wuy_cflua_assign_value(cmd, container, default_value->t);
+		} else if (cmd->name != NULL && (!cmd->u.table->is_omit || inherit_from)) {
 			lua_newtable(L);
-			wuy_cflua_set_table(L, cmd, container);
+			wuy_cflua_set_table(L, cmd, container, inherit_from, false);
 			lua_pop(L, 1);
 		}
 		return;
@@ -640,7 +651,7 @@ static const char *wuy_cflua_strerror(lua_State *L, int err)
 }
 
 const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table,
-		void *container, wuy_pool_t *pool)
+		void *container, wuy_pool_t *pool, const void *inherit_from)
 {
 	struct wuy_cflua_command tmp = {
 		.type = WUY_CFLUA_TYPE_TABLE,
@@ -648,9 +659,10 @@ const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table,
 	};
 
 	wuy_cflua_stack_index = 0;
-	wuy_cflua_pool = pool;
 
-	int ret = wuy_cflua_set_table(L, &tmp, container);
+	wuy_cflua_pool = pool ? pool : wuy_pool_new(4096);
+
+	int ret = wuy_cflua_set_table(L, &tmp, container, inherit_from, false);
 
 	wuy_cflua_pool = NULL;
 
