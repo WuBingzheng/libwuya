@@ -28,7 +28,7 @@ struct wuy_cflua_command {
 
 	const char		*description;
 
-	/* is single array member? */
+	/* is single array member when name==NULL? */
 	bool			is_single_array;
 
 	enum wuy_cflua_type	type;
@@ -52,6 +52,7 @@ struct wuy_cflua_command {
 
 	/* only for multi-member array command. */
 	off_t			array_number_offset;
+	size_t			array_member_size;
 
 	/* offset of default-values-container to inherit for multi-array-members */
 	off_t			inherit_container_offset;
@@ -95,8 +96,10 @@ struct wuy_cflua_table {
 	 * If set 0, do not allocate new container and use the current container. */
 	unsigned		size;
 
-	/* omit if not set */
-	bool			is_omit;
+	/* if this table-command is not set in configuration:
+	 *   may_omit=true: omit it;
+	 *   may_omit=false: allocate table and set members all by default values. */
+	bool			may_omit;
 
 	/* print the table's name, for wuy_cflua_strerror() to print table-stack.
 	 * If this is not set and command->name is set (not array member command),
@@ -106,13 +109,13 @@ struct wuy_cflua_table {
 	/* handler called before parsing */
 	void			(*init)(void *);
 
-	/* handler called after parsing */
+	/* handler called after parsing, return same with wuy_cflua_parse() */
 	const char *		(*post)(void *);
 
 	/* handler called for extra free action */
 	void			(*free)(void *);
 
-	/* handler for arbitrary key-value options */
+	/* handler for arbitrary key-value options, return same with wuy_cflua_parse() */
 	const char *		(*arbitrary)(lua_State *, void *);
 };
 
@@ -127,10 +130,6 @@ extern wuy_pool_t *wuy_cflua_pool;
 /* set by user if necessary when table's post/arbitrary hander fails */
 extern const char *wuy_cflua_post_arg;
 extern const char *wuy_cflua_arbitrary_arg;
-
-struct wuy_cflua_table *wuy_cflua_copy_table_default(const struct wuy_cflua_table *src,
-		const void *default_container);
-void wuy_cflua_free_copied_table(struct wuy_cflua_table *table);
 
 static inline bool wuy_cflua_is_function_set(wuy_cflua_function_t f)
 {
@@ -150,8 +149,6 @@ static inline bool wuy_cflua_is_function_set(wuy_cflua_function_t f)
 #define WUY_CFLUA_LIMITS_UPPER(n)	{ .is_upper = true, .upper = n }
 #define WUY_CFLUA_LIMITS_POSITIVE	WUY_CFLUA_LIMITS_LOWER(1)
 #define WUY_CFLUA_LIMITS_NON_NEGATIVE	WUY_CFLUA_LIMITS_LOWER(0)
-
-void wuy_cflua_build_tables(lua_State *L, struct wuy_cflua_table *table);
 
 void wuy_cflua_dump_table_markdown(const struct wuy_cflua_table *table, int indent);
 

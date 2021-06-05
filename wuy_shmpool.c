@@ -17,8 +17,8 @@
 #define WUY_SHMPOOL_PAGE_SIZE	4096
 #define WUY_SHMPOOL_NHASH	1024
 
-#define _debug printf
-//#define _debug(...)
+//#define _debug printf
+#define _debug(...)
 
 struct wuy_shmpool_map_info {
 	void		*address;
