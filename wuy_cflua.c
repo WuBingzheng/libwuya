@@ -690,12 +690,12 @@ static void wuy_cflua_dump_command_markdown(struct wuy_cflua_command *cmd, int l
 	switch (cmd->type) {
 	case WUY_CFLUA_TYPE_BOOLEAN:
 		if (cmd->default_value.b) {
-			printf(":true");
+			printf(", default=true");
 		}
 		break;
 	case WUY_CFLUA_TYPE_INTEGER:
 		if (cmd->default_value.n != 0) {
-			printf(": %d", cmd->default_value.n);
+			printf(", default=%d", cmd->default_value.n);
 		}
 		if (cmd->limits.n.is_lower) {
 			printf(", min=%d", cmd->limits.n.lower);
@@ -706,7 +706,7 @@ static void wuy_cflua_dump_command_markdown(struct wuy_cflua_command *cmd, int l
 		break;
 	case WUY_CFLUA_TYPE_DOUBLE:
 		if (cmd->default_value.d != 0) {
-			printf(": %g", cmd->default_value.d);
+			printf(", default=%g", cmd->default_value.d);
 		}
 		if (cmd->limits.d.is_lower) {
 			printf(", min=%g", cmd->limits.d.lower);
@@ -717,7 +717,7 @@ static void wuy_cflua_dump_command_markdown(struct wuy_cflua_command *cmd, int l
 		break;
 	case WUY_CFLUA_TYPE_STRING:
 		if (cmd->default_value.s != NULL) {
-			printf(": \"%s\"", cmd->default_value.s);
+			printf(", default=\"%s\"", cmd->default_value.s);
 		}
 		break;
 	case WUY_CFLUA_TYPE_FUNCTION:
