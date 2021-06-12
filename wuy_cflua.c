@@ -635,7 +635,7 @@ static const char *wuy_cflua_strerror(lua_State *L, int err)
 		p += sprintf(p, "invalid command key type: %s", lua_typename(L, lua_type(L, -2)));
 		break;
 	case WUY_CFLUA_ERR_INVALID_CMD:
-		p += sprintf(p, "xinvalid command: %s", lua_tostring(L, -2));
+		p += sprintf(p, "invalid command: %s", lua_tostring(L, -2));
 		break;
 	default:
 		p += sprintf(p, "!!! impossible error code: %d", err);
