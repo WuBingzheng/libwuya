@@ -483,6 +483,18 @@ static void wuy_cflua_set_types(lua_State *L, struct wuy_cflua_command *cmd,
 	}
 }
 
+static bool wuy_cflua_may_omit(struct wuy_cflua_command *cmd, const void *inherit_from)
+{
+	struct wuy_cflua_table *table = cmd->u.table;
+	if (!table->may_omit) {
+		return false;
+	}
+	if (inherit_from == NULL) {
+		return true;
+	}
+	return *(const void **)((const char *)inherit_from + cmd->offset) == NULL;
+}
+
 static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *cmd,
 		void *container, const void *inherit_from)
 {
@@ -525,7 +537,7 @@ static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *
 	case WUY_CFLUA_TYPE_TABLE:
 		if (default_value->t != NULL && cmd->u.table->size != 0) {
 			wuy_cflua_assign_value(cmd, container, default_value->t);
-		} else if (cmd->name != NULL && (!cmd->u.table->may_omit || inherit_from)) {
+		} else if (cmd->name != NULL && !wuy_cflua_may_omit(cmd, inherit_from)) {
 			lua_newtable(L);
 			wuy_cflua_set_table(L, cmd, container, inherit_from);
 			lua_pop(L, 1);
