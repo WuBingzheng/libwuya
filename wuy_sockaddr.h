@@ -41,9 +41,16 @@ bool wuy_sockaddr_loads(const char *str, struct sockaddr_storage *out,
 /**
  * @brief convert address (ip + port) from struct sockaddr_storage into string.
  *
- * @return -1 on fail, or the length of string, excluding the null byte.
+ * @return NULL on error, or @buf if success.
  */
-int wuy_sockaddr_dumps(const struct sockaddr *sa, char *buf, int size);
+const char *wuy_sockaddr_dumps(const struct sockaddr *sa, char *buf, int size);
+
+/**
+ * @brief convert address ip only from struct sockaddr_storage into string.
+ *
+ * @return NULL on error, or @buf if success.
+ */
+const char *wuy_sockaddr_dumps_iponly(const struct sockaddr *sa, char *buf, int size);
 
 /**
  * @brief return size of address by sa->sa_family.

@@ -131,39 +131,60 @@ bool wuy_sockaddr_loads(const char *str, struct sockaddr_storage *out,
 	}
 }
 
-int wuy_sockaddr_dumps(const struct sockaddr *sa, char *buf, int size)
+const char *wuy_sockaddr_dumps_iponly(const struct sockaddr *sa, char *buf, int size)
 {
 	switch (sa->sa_family) {
 	case AF_INET: {
 		struct sockaddr_in *sain = (struct sockaddr_in *)sa;
-		if (inet_ntop(AF_INET, &sain->sin_addr, buf, size) == NULL) {
-			return -1;
-		}
-		int len = strlen(buf);
-		len += snprintf(buf + len, size - len, ":%d", ntohs(sain->sin_port));
-		return len;
+		return inet_ntop(AF_INET, &sain->sin_addr, buf, size);
 	}
 	case AF_INET6: {
 		struct sockaddr_in6 *sain6 = (struct sockaddr_in6 *)sa;
 		buf[0] = '[';
 		if (inet_ntop(AF_INET6, &sain6->sin6_addr, buf + 1, size - 2) == NULL) {
-			return -1;
+			return NULL;
 		}
-		int len = strlen(buf);
-		len += snprintf(buf + len, size - len, "]:%d", ntohs(sain6->sin6_port));
-		return len;
+		char *end = buf + strlen(buf);
+		end[0] = ']';
+		end[1] = '0';
+		return buf;
 	}
 	case AF_UNIX: {
 		const struct sockaddr_un *sun = (const struct sockaddr_un *)sa;
 		memcpy(buf, "unix:", 5);
 		strncpy(buf + 5, sun->sun_path, size - 5);
-		return strlen(buf);
-
+		return buf;
 	}
 	default:
-		abort();
-		return 0;
+		return NULL;
 	}
+}
+
+const char *wuy_sockaddr_dumps(const struct sockaddr *sa, char *buf, int size)
+{
+	if (wuy_sockaddr_dumps_iponly(sa, buf, size) == NULL) {
+		return NULL;
+	}
+
+	unsigned port = 0;
+	switch (sa->sa_family) {
+	case AF_INET: {
+		struct sockaddr_in *sain = (struct sockaddr_in *)sa;
+		port = ntohs(sain->sin_port);
+		break;
+	}
+	case AF_INET6: {
+		struct sockaddr_in6 *sain6 = (struct sockaddr_in6 *)sa;
+		port = ntohs(sain6->sin6_port);
+		break;
+	}
+	default:
+		return buf;
+	}
+
+	int len = strlen(buf);
+	snprintf(buf + len, size - len, ":%d", port);
+	return buf;
 }
 
 size_t wuy_sockaddr_size(const struct sockaddr *sa)
