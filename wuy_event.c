@@ -75,7 +75,7 @@ int wuy_event_add_listen(wuy_event_ctx_t *ctx, int fd, void *data)
 {
 	uint32_t op = EPOLLIN;
 #ifdef EPOLLEXCLUSIVE
-	op |= EPOLLEXCLUSIVE
+	op |= EPOLLEXCLUSIVE;
 #endif
 	return wuy_event_op(ctx->fd, fd, EPOLL_CTL_ADD, op, data);
 }
