@@ -702,3 +702,34 @@ int wuy_http_range_parse(const char *value_str, int value_len, off_t total_size,
 
 	return range - ranges;
 }
+
+/* TODO escape */
+const char *wuy_http_cookie_get(const char *cookie, int *p_cookie_len,
+		const char *name, int name_len)
+{
+	int cookie_len = *p_cookie_len;
+	while (1) {
+		if (memcmp(cookie, name, name_len) == 0 && cookie[name_len] == '=') {
+			break; /* find */
+		}
+
+		const char *end = memchr(cookie, ';', cookie_len);
+		if (end == NULL) {
+			return NULL; /* fail */
+		}
+		end++;
+		while (*end == ' ') end++;
+		cookie_len -= end - cookie;
+		cookie = end;
+	}
+
+	/* find */
+	cookie += name_len + 1;
+	cookie_len -= name_len + 1;
+	const char *end = memchr(cookie, ';', cookie_len);
+	if (end != NULL) {
+		cookie_len = end - cookie;
+	}
+	*p_cookie_len = cookie_len;
+	return cookie;
+}

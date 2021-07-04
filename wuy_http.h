@@ -155,4 +155,7 @@ struct wuy_http_range {
 int wuy_http_range_parse(const char *value_str, int value_len, off_t total_size,
 		struct wuy_http_range *ranges, int range_num);
 
+const char *wuy_http_cookie_get(const char *cookie, int *p_cookie_len,
+		const char *name, int name_len);
+
 #endif
