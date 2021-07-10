@@ -12,7 +12,7 @@ enum wuy_cflua_type {
 	WUY_CFLUA_TYPE_BOOLEAN = LUA_TBOOLEAN,
 	WUY_CFLUA_TYPE_INTEGER = 100, /* new type */
 	WUY_CFLUA_TYPE_ENUMSTR = 101, /* new type */
-	WUY_CFLUA_TYPE_DOUBLE = LUA_TNUMBER,
+	WUY_CFLUA_TYPE_FLOAT = LUA_TNUMBER,
 	WUY_CFLUA_TYPE_STRING = LUA_TSTRING,
 	WUY_CFLUA_TYPE_FUNCTION = LUA_TFUNCTION,
 	WUY_CFLUA_TYPE_TABLE = LUA_TTABLE,
@@ -65,22 +65,22 @@ struct wuy_cflua_command {
 	union wuy_cflua_default_value {
 		bool			b;
 		int			n;
-		double			d;
+		float			d;
 		wuy_cflua_function_t	f;
 		const char		*s;
 		const void		*p;
 		const void		*t;
 	} default_value;
 
-	/* limits, only for WUY_CFLUA_TYPE_INTEGER, WUY_CFLUA_TYPE_DOUBLE, and WUY_CFLUA_TYPE_ENUMSTR */
+	/* limits, only for WUY_CFLUA_TYPE_INTEGER, WUY_CFLUA_TYPE_FLOAT, and WUY_CFLUA_TYPE_ENUMSTR */
 	union {
 		struct wuy_cflua_command_limits_int {
 			bool	is_lower, is_upper;
 			int	lower, upper;
 		} n;
-		struct wuy_cflua_command_limits_double {
+		struct wuy_cflua_command_limits_float {
 			bool	is_lower, is_upper;
-			double	lower, upper;
+			float	lower, upper;
 		} d;
 		const char **e; /* available ENUMSTR candidates */
 	} limits;

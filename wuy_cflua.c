@@ -144,10 +144,9 @@ static void wuy_cflua_set_integer(lua_State *L, struct wuy_cflua_command *cmd, v
 	wuy_cflua_assign_value(cmd, container, value);
 	_debug("  SET(int)=%d\n", value);
 }
-static void wuy_cflua_set_double(lua_State *L, struct wuy_cflua_command *cmd, void *container)
+static void wuy_cflua_set_float(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
-	/* we assume that lua_Number is double */
-	lua_Number value = lua_tonumber(L, -1);
+	float value = lua_tonumber(L, -1);
 
 	if (cmd->limits.d.is_lower && value < cmd->limits.d.lower) {
 		return wuy_cflua_error(WUY_CFLUA_ERR_LIMIT);
@@ -157,7 +156,7 @@ static void wuy_cflua_set_double(lua_State *L, struct wuy_cflua_command *cmd, vo
 	}
 
 	wuy_cflua_assign_value(cmd, container, value);
-	_debug("  SET(double)=%f\n", value);
+	_debug("  SET(float)=%f\n", value);
 }
 
 static void wuy_cflua_set_types(lua_State *L, struct wuy_cflua_command *cmd,
@@ -173,7 +172,7 @@ static size_t wuy_cflua_type_size(enum wuy_cflua_type type)
 	case WUY_CFLUA_TYPE_BOOLEAN: return sizeof(bool);
 	case WUY_CFLUA_TYPE_INTEGER: return sizeof(int);
 	case WUY_CFLUA_TYPE_ENUMSTR: return sizeof(int);
-	case WUY_CFLUA_TYPE_DOUBLE: return sizeof(double);
+	case WUY_CFLUA_TYPE_FLOAT: return sizeof(float);
 	case WUY_CFLUA_TYPE_STRING: return sizeof(char *);
 	case WUY_CFLUA_TYPE_FUNCTION: return sizeof(wuy_cflua_function_t);
 	case WUY_CFLUA_TYPE_TABLE: return sizeof(void *);
@@ -497,8 +496,8 @@ static void wuy_cflua_set_types(lua_State *L, struct wuy_cflua_command *cmd,
 	case WUY_CFLUA_TYPE_ENUMSTR:
 		wuy_cflua_set_enumstr(L, cmd, container);
 		break;
-	case WUY_CFLUA_TYPE_DOUBLE:
-		wuy_cflua_set_double(L, cmd, container);
+	case WUY_CFLUA_TYPE_FLOAT:
+		wuy_cflua_set_float(L, cmd, container);
 		break;
 	case WUY_CFLUA_TYPE_STRING:
 		wuy_cflua_set_string(L, cmd, container);
@@ -556,7 +555,7 @@ static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *
 	case WUY_CFLUA_TYPE_ENUMSTR:
 		wuy_cflua_assign_value(cmd, container, default_value->n);
 		break;
-	case WUY_CFLUA_TYPE_DOUBLE:
+	case WUY_CFLUA_TYPE_FLOAT:
 		wuy_cflua_assign_value(cmd, container, default_value->d);
 		break;
 	case WUY_CFLUA_TYPE_STRING:
@@ -589,7 +588,7 @@ static const char *wuy_cflua_strtype(enum wuy_cflua_type type)
 	case WUY_CFLUA_TYPE_BOOLEAN: return "boolean";
 	case WUY_CFLUA_TYPE_INTEGER: return "integer";
 	case WUY_CFLUA_TYPE_ENUMSTR: return "enumstr";
-	case WUY_CFLUA_TYPE_DOUBLE: return "double";
+	case WUY_CFLUA_TYPE_FLOAT: return "float";
 	case WUY_CFLUA_TYPE_STRING: return "string";
 	case WUY_CFLUA_TYPE_FUNCTION: return "function";
 	case WUY_CFLUA_TYPE_TABLE: return "table";
@@ -664,8 +663,8 @@ static const char *wuy_cflua_strerror(lua_State *L, int err)
 			} else {
 				p += sprintf(p, "(-, %d]", limits->upper);
 			}
-		} else if (wuy_cflua_current_cmd->type == WUY_CFLUA_TYPE_DOUBLE) {
-			struct wuy_cflua_command_limits_double *limits = &wuy_cflua_current_cmd->limits.d;
+		} else if (wuy_cflua_current_cmd->type == WUY_CFLUA_TYPE_FLOAT) {
+			struct wuy_cflua_command_limits_float *limits = &wuy_cflua_current_cmd->limits.d;
 			if (limits->is_lower && limits->is_upper) {
 				p += sprintf(p, "[%g, %g]", limits->lower, limits->upper);
 			} else if (limits->is_lower) {
@@ -771,7 +770,7 @@ static void wuy_cflua_dump_command_markdown(struct wuy_cflua_command *cmd, int l
 		}
 		printf("]");
 		break;
-	case WUY_CFLUA_TYPE_DOUBLE:
+	case WUY_CFLUA_TYPE_FLOAT:
 		if (cmd->default_value.d != 0) {
 			printf(", default=%g", cmd->default_value.d);
 		}
