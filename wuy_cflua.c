@@ -31,6 +31,8 @@ static struct wuy_cflua_stack {
 } wuy_cflua_stacks[100];
 static int wuy_cflua_stack_index = 0;
 
+static int wuy_cflua_fenv = 0;
+
 static const char *wuy_cflua_post_err;
 const char *wuy_cflua_post_arg; /* set by user */
 
@@ -76,6 +78,11 @@ static void wuy_cflua_set_function(lua_State *L, struct wuy_cflua_command *cmd, 
 
 	_debug("  SET(function)=%d\n", f);
 
+	if (wuy_cflua_fenv != 0) {
+		lua_pushvalue(L, wuy_cflua_fenv);
+		lua_setfenv(L, -2);
+	}
+
 	static struct wuy_cflua_free_function_ctx *last_ctx = NULL;
 	if (last_ctx != NULL && L == last_ctx->L && f == last_ctx->next) {
 		last_ctx->next++;
@@ -99,6 +106,24 @@ static void wuy_cflua_set_string(lua_State *L, struct wuy_cflua_command *cmd, vo
 	if (cmd->u.length_offset != 0) {
 		WUY_CFLUA_PINT(container, cmd->u.length_offset) = len;
 	}
+}
+static void wuy_cflua_set_enumstr(lua_State *L, struct wuy_cflua_command *cmd, void *container)
+{
+	const char *str = lua_tostring(L, -1);
+
+	_debug("  SET(enumstr)=%s\n", str);
+
+	int i = 0;
+	const char *e;
+	while ((e = cmd->limits.e[i]) != NULL) {
+		if (strcmp(str, e) == 0) {
+			int v = cmd->enum_values ? cmd->enum_values[i] : i;
+			wuy_cflua_assign_value(cmd, container, v);
+			return;
+		}
+		i++;
+	}
+	return wuy_cflua_error(WUY_CFLUA_ERR_LIMIT);
 }
 static void wuy_cflua_set_boolean(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
@@ -147,6 +172,7 @@ static size_t wuy_cflua_type_size(enum wuy_cflua_type type)
 	switch (type) {
 	case WUY_CFLUA_TYPE_BOOLEAN: return sizeof(bool);
 	case WUY_CFLUA_TYPE_INTEGER: return sizeof(int);
+	case WUY_CFLUA_TYPE_ENUMSTR: return sizeof(int);
 	case WUY_CFLUA_TYPE_DOUBLE: return sizeof(double);
 	case WUY_CFLUA_TYPE_STRING: return sizeof(char *);
 	case WUY_CFLUA_TYPE_FUNCTION: return sizeof(wuy_cflua_function_t);
@@ -425,6 +451,8 @@ static bool wuy_cflua_type_equal(int tvalue, enum wuy_cflua_type tcmd)
 {
 	if (tcmd == WUY_CFLUA_TYPE_INTEGER) {
 		tcmd = LUA_TNUMBER;
+	} else if (tcmd == WUY_CFLUA_TYPE_ENUMSTR) {
+		tcmd = LUA_TSTRING;
 	}
 	return tvalue == tcmd;
 }
@@ -465,6 +493,9 @@ static void wuy_cflua_set_types(lua_State *L, struct wuy_cflua_command *cmd,
 		break;
 	case WUY_CFLUA_TYPE_INTEGER:
 		wuy_cflua_set_integer(L, cmd, container);
+		break;
+	case WUY_CFLUA_TYPE_ENUMSTR:
+		wuy_cflua_set_enumstr(L, cmd, container);
 		break;
 	case WUY_CFLUA_TYPE_DOUBLE:
 		wuy_cflua_set_double(L, cmd, container);
@@ -522,6 +553,9 @@ static void wuy_cflua_set_default_value(lua_State *L, struct wuy_cflua_command *
 	case WUY_CFLUA_TYPE_INTEGER:
 		wuy_cflua_assign_value(cmd, container, default_value->n);
 		break;
+	case WUY_CFLUA_TYPE_ENUMSTR:
+		wuy_cflua_assign_value(cmd, container, default_value->n);
+		break;
 	case WUY_CFLUA_TYPE_DOUBLE:
 		wuy_cflua_assign_value(cmd, container, default_value->d);
 		break;
@@ -554,6 +588,7 @@ static const char *wuy_cflua_strtype(enum wuy_cflua_type type)
 	case WUY_CFLUA_TYPE_END: return "!END";
 	case WUY_CFLUA_TYPE_BOOLEAN: return "boolean";
 	case WUY_CFLUA_TYPE_INTEGER: return "integer";
+	case WUY_CFLUA_TYPE_ENUMSTR: return "enumstr";
 	case WUY_CFLUA_TYPE_DOUBLE: return "double";
 	case WUY_CFLUA_TYPE_STRING: return "string";
 	case WUY_CFLUA_TYPE_FUNCTION: return "function";
@@ -629,7 +664,7 @@ static const char *wuy_cflua_strerror(lua_State *L, int err)
 			} else {
 				p += sprintf(p, "(-, %d]", limits->upper);
 			}
-		} else {
+		} else if (wuy_cflua_current_cmd->type == WUY_CFLUA_TYPE_DOUBLE) {
 			struct wuy_cflua_command_limits_double *limits = &wuy_cflua_current_cmd->limits.d;
 			if (limits->is_lower && limits->is_upper) {
 				p += sprintf(p, "[%g, %g]", limits->lower, limits->upper);
@@ -638,6 +673,12 @@ static const char *wuy_cflua_strerror(lua_State *L, int err)
 			} else {
 				p += sprintf(p, "(-, %g]", limits->upper);
 			}
+		} else if (wuy_cflua_current_cmd->type == WUY_CFLUA_TYPE_ENUMSTR) {
+			p += sprintf(p, "[");
+			for (const char **pp = wuy_cflua_current_cmd->limits.e; *pp != NULL; pp++) {
+				p += sprintf(p, "\"%s\",", *pp);
+			}
+			p[-1] = ']';
 		}
 		break;
 	case WUY_CFLUA_ERR_NO_ARRAY:
@@ -681,6 +722,11 @@ const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table,
 	return WUY_CFLUA_OK;
 }
 
+void wuy_cflua_setfenv(int index)
+{
+	wuy_cflua_fenv = index;
+}
+
 
 /* === dump to markdown === */
 
@@ -699,6 +745,7 @@ static void wuy_cflua_dump_command_markdown(struct wuy_cflua_command *cmd, int l
 			cmd->name ? cmd->name : cmd->is_single_array ? "SINGLE_ARRAY_MEMBER" : "MULTIPLE_ARRAY_MEMBER",
 			wuy_cflua_strtype(cmd->type));
 
+	const char **pp;
 	switch (cmd->type) {
 	case WUY_CFLUA_TYPE_BOOLEAN:
 		if (cmd->default_value.b) {
@@ -715,6 +762,14 @@ static void wuy_cflua_dump_command_markdown(struct wuy_cflua_command *cmd, int l
 		if (cmd->limits.n.is_upper) {
 			printf(", max=%d", cmd->limits.n.upper);
 		}
+		break;
+	case WUY_CFLUA_TYPE_ENUMSTR:
+		pp = cmd->limits.e;
+		printf(", default=\"%s\", candidates: ", pp[cmd->default_value.n]);
+		for (; *pp != NULL; pp++) {
+			printf("%c\"%s\"", pp==cmd->limits.e ? '[' : ',', *pp);
+		}
+		printf("]");
 		break;
 	case WUY_CFLUA_TYPE_DOUBLE:
 		if (cmd->default_value.d != 0) {

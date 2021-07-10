@@ -11,6 +11,7 @@ enum wuy_cflua_type {
 	WUY_CFLUA_TYPE_END = 0,
 	WUY_CFLUA_TYPE_BOOLEAN = LUA_TBOOLEAN,
 	WUY_CFLUA_TYPE_INTEGER = 100, /* new type */
+	WUY_CFLUA_TYPE_ENUMSTR = 101, /* new type */
 	WUY_CFLUA_TYPE_DOUBLE = LUA_TNUMBER,
 	WUY_CFLUA_TYPE_STRING = LUA_TSTRING,
 	WUY_CFLUA_TYPE_FUNCTION = LUA_TFUNCTION,
@@ -71,7 +72,7 @@ struct wuy_cflua_command {
 		const void		*t;
 	} default_value;
 
-	/* limits, only for WUY_CFLUA_TYPE_INTEGER and WUY_CFLUA_TYPE_DOUBLE */
+	/* limits, only for WUY_CFLUA_TYPE_INTEGER, WUY_CFLUA_TYPE_DOUBLE, and WUY_CFLUA_TYPE_ENUMSTR */
 	union {
 		struct wuy_cflua_command_limits_int {
 			bool	is_lower, is_upper;
@@ -81,7 +82,11 @@ struct wuy_cflua_command {
 			bool	is_lower, is_upper;
 			double	lower, upper;
 		} d;
+		const char **e; /* available ENUMSTR candidates */
 	} limits;
+
+	/* corresponding values to limits.e */
+	int				*enum_values;
 
 	/* used internal */
 	struct wuy_cflua_command	*real;
@@ -135,6 +140,8 @@ static inline bool wuy_cflua_is_function_set(wuy_cflua_function_t f)
 {
 	return f != 0;
 }
+
+void wuy_cflua_setfenv(int index);
 
 #define WUY_CFLUA_ARRAY_STRING_TABLE &(struct wuy_cflua_table) { \
 	.commands = (struct wuy_cflua_command[2]) { { .type = WUY_CFLUA_TYPE_STRING } } \
