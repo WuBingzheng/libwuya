@@ -136,12 +136,13 @@ extern wuy_pool_t *wuy_cflua_pool;
 extern const char *wuy_cflua_post_arg;
 extern const char *wuy_cflua_arbitrary_arg;
 
+/* set this with a ENV if you want a sandbox */
+extern int wuy_cflua_fenv;
+
 static inline bool wuy_cflua_is_function_set(wuy_cflua_function_t f)
 {
 	return f != 0;
 }
-
-void wuy_cflua_setfenv(int index);
 
 #define WUY_CFLUA_ARRAY_STRING_TABLE &(struct wuy_cflua_table) { \
 	.commands = (struct wuy_cflua_command[2]) { { .type = WUY_CFLUA_TYPE_STRING } } \

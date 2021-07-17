@@ -31,7 +31,7 @@ static struct wuy_cflua_stack {
 } wuy_cflua_stacks[100];
 static int wuy_cflua_stack_index = 0;
 
-static int wuy_cflua_fenv = 0;
+int wuy_cflua_fenv = 0;
 
 static const char *wuy_cflua_post_err;
 const char *wuy_cflua_post_arg; /* set by user */
@@ -719,11 +719,6 @@ const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table,
 	wuy_cflua_pool = NULL;
 
 	return WUY_CFLUA_OK;
-}
-
-void wuy_cflua_setfenv(int index)
-{
-	wuy_cflua_fenv = index;
 }
 
 
