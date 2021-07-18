@@ -31,8 +31,6 @@ static struct wuy_cflua_stack {
 } wuy_cflua_stacks[100];
 static int wuy_cflua_stack_index = 0;
 
-int wuy_cflua_fenv = 0;
-
 static const char *wuy_cflua_post_err;
 const char *wuy_cflua_post_arg; /* set by user */
 
@@ -47,6 +45,8 @@ static struct wuy_cflua_command	*wuy_cflua_current_cmd;
  * for handlers in struct wuy_cflua_table, for the same reason. */
 wuy_pool_t *wuy_cflua_pool;
 
+static void (*wuy_cflua_function_hook)(lua_State *, wuy_cflua_function_t);
+
 static jmp_buf wuy_cflua_errjmp_buf;
 #define wuy_cflua_error(ret) longjmp(wuy_cflua_errjmp_buf, ret)
 
@@ -56,20 +56,6 @@ static jmp_buf wuy_cflua_errjmp_buf;
 #define wuy_cflua_assign_value(cmd, container, value) \
 	*(typeof(value) *)(((char *)container) + (cmd)->offset) = value
 
-struct wuy_cflua_free_function_ctx {
-	lua_State		*L;
-	wuy_cflua_function_t	begin;
-	wuy_cflua_function_t	next;
-};
-
-static void wuy_cflua_free_function(void *data)
-{
-	struct wuy_cflua_free_function_ctx *ctx = data;
-	for (wuy_cflua_function_t i = ctx->begin; i < ctx->next; i++) {
-		luaL_unref(ctx->L, LUA_REGISTRYINDEX, i);
-	}
-}
-
 static void wuy_cflua_set_function(lua_State *L, struct wuy_cflua_command *cmd, void *container)
 {
 	lua_pushvalue(L, -1);
@@ -78,20 +64,8 @@ static void wuy_cflua_set_function(lua_State *L, struct wuy_cflua_command *cmd, 
 
 	_debug("  SET(function)=%d\n", f);
 
-	if (wuy_cflua_fenv != 0) {
-		lua_pushvalue(L, wuy_cflua_fenv);
-		lua_setfenv(L, -2);
-	}
-
-	static struct wuy_cflua_free_function_ctx *last_ctx = NULL;
-	if (last_ctx != NULL && L == last_ctx->L && f == last_ctx->next) {
-		last_ctx->next++;
-	} else {
-		last_ctx = wuy_pool_alloc(wuy_cflua_pool, sizeof(struct wuy_cflua_free_function_ctx));
-		last_ctx->L = L;
-		last_ctx->begin = f;
-		last_ctx->next = f + 1;
-		wuy_pool_add_free(wuy_cflua_pool, wuy_cflua_free_function, last_ctx);
+	if (wuy_cflua_function_hook != NULL) {
+		wuy_cflua_function_hook(L, f);
 	}
 }
 static void wuy_cflua_set_string(lua_State *L, struct wuy_cflua_command *cmd, void *container)
@@ -697,8 +671,8 @@ static const char *wuy_cflua_strerror(lua_State *L, int err)
 	return buffer;
 }
 
-const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table,
-		void *container, wuy_pool_t *pool, const void *inherit_from)
+const char *wuy_cflua_parse_opts(lua_State *L, struct wuy_cflua_table *table,
+		void *container, struct wuy_cflua_options *opts)
 {
 	struct wuy_cflua_command tmp = {
 		.type = WUY_CFLUA_TYPE_TABLE,
@@ -706,17 +680,18 @@ const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table,
 	};
 
 	wuy_cflua_stack_index = 0;
+	wuy_cflua_pool = opts->pool != NULL ? opts->pool : wuy_pool_new(4096);
+	wuy_cflua_function_hook = opts->function_hook;
 
 	int ret = setjmp(wuy_cflua_errjmp_buf);
 	if (ret != 0) {
+		if (opts->pool == NULL) {
+			wuy_pool_destroy(wuy_cflua_pool);
+		}
 		return wuy_cflua_strerror(L, ret);
 	}
 
-	wuy_cflua_pool = pool ? pool : wuy_pool_new(4096);
-
-	wuy_cflua_set_table(L, &tmp, container, inherit_from);
-
-	wuy_cflua_pool = NULL;
+	wuy_cflua_set_table(L, &tmp, container, opts->inherit_from);
 
 	return WUY_CFLUA_OK;
 }

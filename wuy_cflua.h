@@ -124,10 +124,21 @@ struct wuy_cflua_table {
 	const char *		(*arbitrary)(lua_State *, void *);
 };
 
+struct wuy_cflua_options {
+	wuy_pool_t	*pool;
+	const void	*inherit_from;
+	void		(*function_hook)(lua_State *, wuy_cflua_function_t);
+};
+
 /* return WUY_CFLUA_OK if successful, or error reason if fail */
 #define WUY_CFLUA_OK (const char *)0
-const char *wuy_cflua_parse(lua_State *L, struct wuy_cflua_table *table,
-		void *container, wuy_pool_t *pool, const void *inherit_from);
+
+const char *wuy_cflua_parse_opts(lua_State *L, struct wuy_cflua_table *table,
+		void *container, struct wuy_cflua_options *);
+
+/* Use this as named-argument, `wuy_cflua_parse_opts(L, t, c, .pool=pool)` */
+#define wuy_cflua_parse(L, table, container, ...) \
+	wuy_cflua_parse_opts(L, table, container, &(struct wuy_cflua_options){__VA_ARGS__})
 
 /* could be used by handlers in struct wuy_cflua_table */
 extern wuy_pool_t *wuy_cflua_pool;
@@ -135,9 +146,6 @@ extern wuy_pool_t *wuy_cflua_pool;
 /* set by user if necessary when table's post/arbitrary hander fails */
 extern const char *wuy_cflua_post_arg;
 extern const char *wuy_cflua_arbitrary_arg;
-
-/* set this with a ENV if you want a sandbox */
-extern int wuy_cflua_fenv;
 
 static inline bool wuy_cflua_is_function_set(wuy_cflua_function_t f)
 {
