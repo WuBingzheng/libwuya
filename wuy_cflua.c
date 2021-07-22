@@ -437,7 +437,7 @@ static bool wuy_cflua_check_type(lua_State *L, struct wuy_cflua_command *cmd)
 	}
 
 	if (cmd->type == WUY_CFLUA_TYPE_TABLE) {
-		/* grammar suger: for the table value with only one array member,
+		/* Syntactic sugar: for the table value with only one array member,
 		 * the table can be ommited */
 		struct wuy_cflua_command *c0 = &cmd->u.table->commands[0];
 		if (c0->name == NULL && wuy_cflua_type_equal(type, c0->type)) {

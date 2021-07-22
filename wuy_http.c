@@ -585,12 +585,13 @@ bool wuy_http_chunked_is_finished(const wuy_http_chunked_t *chunked)
 	return chunked->state == WUY_HTTP_CHUNKED_FINISH;
 }
 
-#define WUY_HTTP_DATE_FORMAT "%a, %d %b %Y %H:%M:%S GMT"
+#define WUY_HTTP_DATE_FORMAT_	"%a, %d %b %Y %H:%M:%S "
+#define WUY_HTTP_DATE_FORMAT	WUY_HTTP_DATE_FORMAT "gmt"
 time_t wuy_http_date_parse(const char *str)
 {
 	struct tm tm;
-	char *end = strptime(str, WUY_HTTP_DATE_FORMAT, &tm);
-	if (*end != '\0') {
+	char *end = strptime(str, WUY_HTTP_DATE_FORMAT_, &tm);
+	if (end == NULL || strcasecmp(end, "gmt") != 0) {
 		return -1;
 	}
 	return timegm(&tm);
@@ -709,7 +710,7 @@ const char *wuy_http_cookie_get(const char *cookie, int *p_cookie_len,
 {
 	int cookie_len = *p_cookie_len;
 	while (1) {
-		if (memcmp(cookie, name, name_len) == 0 && cookie[name_len] == '=') {
+		if (strncasecmp(cookie, name, name_len) == 0 && cookie[name_len] == '=') {
 			break; /* find */
 		}
 
