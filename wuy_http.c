@@ -586,7 +586,7 @@ bool wuy_http_chunked_is_finished(const wuy_http_chunked_t *chunked)
 }
 
 #define WUY_HTTP_DATE_FORMAT_	"%a, %d %b %Y %H:%M:%S "
-#define WUY_HTTP_DATE_FORMAT	WUY_HTTP_DATE_FORMAT "gmt"
+#define WUY_HTTP_DATE_FORMAT	WUY_HTTP_DATE_FORMAT_ "gmt"
 time_t wuy_http_date_parse(const char *str)
 {
 	struct tm tm;
